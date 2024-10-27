@@ -18,11 +18,10 @@ export const authOptions: AuthOptions = {
     adapter: MongoDBAdapter(client) as Adapter,
     pages: { 
         signIn: "/auth/signin",
+        newUser: '/create-companion',
     },
     callbacks: {
-        redirect({ url, baseUrl }) {
-            return url;
-        }
+        
     }
 }
 

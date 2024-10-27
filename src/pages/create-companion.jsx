@@ -161,7 +161,7 @@ const CreateCompanionForm = () => {
          }
 
          const data = await response.json();
-         router.push('/dashboard');
+         router.push('/chat');
       } catch (error) {
          console.error('Error creating companion:', error);
          setError('Failed to create companion. Please try again.');
