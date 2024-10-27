@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { AIRequest, AIResponse, Message } from "./types";
+import client from "@/lib/db/client";
 
 if (!process.env.CF_API_TOKEN || !process.env.CF_ACCOUNT_ID) {
   throw new Error("Missing required environment variables: CF_API_TOKEN and/or CF_ACCOUNT_ID");
@@ -27,12 +28,16 @@ export default async function handler(
     return;
   }
 
-  const { conversationMessages } = req.body;
+  const { userId, conversationMessages } = req.body;
+
+  const companion = await client.db("DB").collection("Companions").findOne({ userId: userId });
+
+  console.log("Companion:", companion);
 
   let messages: Message[] = [
     {
       role: "system",
-      content: " \
+      content: companion?.masterPrompt ?? " \
         You are a close relative or companion of an individual with dementia. \
         Your job is to help them remember important details about their life. \
         Provide short, concise answers that provide them with companionship. \
@@ -42,7 +47,7 @@ export default async function handler(
         The user may ask you to repeat information, so be prepared to do so. \
         If the user's message contains any potentially distressed/sad/angry messages, work to alleviate these emotions and relax them."
     }, 
-    ...conversationMessages.map((message: any) => {
+    ...conversationMessages.slice(-8).map((message: any) => {
       return {
         role: message.role,
         content: message.content,
@@ -66,6 +71,7 @@ async function run(input: AIRequest): Promise<AIResponse> {
   console.log("Executing model with input: ", input);
 
   // TODO --> Fine-tune parameters to get something a bit more suitable for this project
+  // Potentially limit the max input tokens 
   const requestBody = {
     ...input,
     max_tokens: 256,  

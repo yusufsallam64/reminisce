@@ -184,7 +184,7 @@
        },
        {
          "id": "favorites",
-         "label": "List their favorites",
+         "label": "List their favorite pieces of media",
          "type": "textarea",
          "required": true
        },
