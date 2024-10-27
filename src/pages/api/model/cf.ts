@@ -47,7 +47,7 @@ export default async function handler(
         The user may ask you to repeat information, so be prepared to do so. \
         If the user's message contains any potentially distressed/sad/angry messages, work to alleviate these emotions and relax them."
     }, 
-    ...conversationMessages.map((message: any) => {
+    ...conversationMessages.slice(-8).map((message: any) => {
       return {
         role: message.role,
         content: message.content,
