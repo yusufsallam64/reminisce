@@ -15,6 +15,10 @@ const config: Config = {
         secondary: "var(--secondary)",
         accent: "var(--accent)",
       },
+      fontFamily: {
+        roboto: ['ReThink', 'sans-serif'],
+      },
+        
     },
   },
   plugins: [],
