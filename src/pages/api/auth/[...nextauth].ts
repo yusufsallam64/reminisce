@@ -19,8 +19,11 @@ export const authOptions: AuthOptions = {
     pages: { 
         signIn: "/auth/signin",
     },
-    events: {},
-    callbacks: {},
+    callbacks: {
+        redirect({ url, baseUrl }) {
+            return url;
+        }
+    }
 }
 
 export default NextAuth(authOptions)

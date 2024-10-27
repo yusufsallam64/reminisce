@@ -1,0 +1,200 @@
+{
+   "personal": {
+     "title": "Personal Information",
+     "description": "Basic information about your loved one",
+     "questions": [
+       {
+         "id": "name",
+         "label": "Full Name",
+         "type": "text",
+         "required": true
+       },
+       {
+         "id": "nickname",
+         "label": "Nickname",
+         "type": "text",
+         "required": false
+       },
+       {
+         "id": "birthday",
+         "label": "Birthday",
+         "type": "date",
+         "required": true
+       },
+       {
+         "id": "lovedOnes",
+         "label": "Loved Ones",
+         "type": "loved-ones",
+         "description": "Add family members and close friends",
+         "fields": [
+           {
+             "id": "name",
+             "placeholder": "Name"
+           },
+           {
+             "id": "relationship",
+             "placeholder": "Relationship (e.g., son, daughter, friend)"
+           }
+         ]
+       },
+       {
+         "id": "nationality",
+         "label": "Nationality",
+         "type": "text",
+         "required": false
+       },
+       {
+         "id": "nationalityIdentification",
+         "label": "How much do they identify with their nationality?",
+         "type": "textarea",
+         "required": false
+       },
+       {
+         "id": "religion",
+         "label": "Religion",
+         "type": "text",
+         "required": false
+       },
+       {
+         "id": "religionExtent",
+         "label": "To what extent do they practice their religion?",
+         "type": "textarea",
+         "required": false
+       }
+     ]
+   },
+   "lifeExperiences": {
+     "title": "Life Experiences & Memories",
+     "description": "Important experiences that shaped their life",
+     "questions": [
+       {
+         "id": "significantExperience",
+         "label": "Share a memorable moment or story",
+         "type": "textarea",
+         "required": true
+       },
+       {
+         "id": "primaryResidence",
+         "label": "Where did they live most of their life?",
+         "type": "text",
+         "required": true
+       },
+       {
+         "id": "career",
+         "label": "What was their career/profession?",
+         "type": "text",
+         "required": true
+       },
+       {
+         "id": "achievements",
+         "label": "What were their biggest achievements?",
+         "type": "textarea",
+         "required": true
+       },
+       {
+         "id": "hardships",
+         "label": "What hardships or challenges shaped them?",
+         "type": "textarea",
+         "required": false
+       }
+     ]
+   },
+   "personality": {
+     "title": "Personality & Communication Style",
+     "description": "How they interact and express themselves",
+     "questions": [
+       {
+         "id": "commonPhrases",
+         "label": "What specific phrases or expressions do they use frequently?",
+         "type": "textarea",
+         "required": true
+       },
+       {
+         "id": "communicationStyle",
+         "label": "Are they formal or casual in conversation?",
+         "type": "select",
+         "options": [
+           "Very formal",
+           "Somewhat formal",
+           "Balanced",
+           "Casual",
+           "Very casual"
+         ],
+         "required": true
+       },
+       {
+         "id": "humorType",
+         "label": "Describe their sense of humor",
+         "type": "textarea",
+         "required": true
+       },
+       {
+         "id": "affectionStyle",
+         "label": "How do they show affection or care?",
+         "type": "textarea",
+         "required": true
+       },
+       {
+         "id": "passion",
+         "label": "What was their passion?",
+         "type": "textarea",
+         "required": true
+       }
+     ]
+   },
+   "interests": {
+     "title": "Interests & Preferences",
+     "description": "Their favorite activities and preferences",
+     "questions": [
+       {
+         "id": "hobbies",
+         "label": "What are their shared hobbies and pastimes?",
+         "type": "textarea",
+         "required": true
+       },
+       {
+         "id": "musicGenre",
+         "label": "What genres of music do they enjoy?",
+         "type": "multiselect",
+         "options": [
+           "Classical",
+           "Jazz",
+           "Rock",
+           "Pop",
+           "Country",
+           "Folk",
+           "Religious",
+           "Other"
+         ],
+         "allowOther": true,
+         "required": false
+       },
+       {
+         "id": "foods",
+         "label": "What are their favorite foods?",
+         "type": "textarea",
+         "required": false
+       },
+       {
+         "id": "mediaPreferences",
+         "label": "What sort of media do they consume?",
+         "type": "textarea",
+         "placeholder": "Books, Movies, Shows, etc.",
+         "required": false
+       },
+       {
+         "id": "favorites",
+         "label": "List their favorites",
+         "type": "textarea",
+         "required": true
+       },
+       {
+         "id": "traditions",
+         "label": "Any specific traditions?",
+         "type": "textarea",
+         "placeholder": "Family traditions, holiday customs, or personal rituals",
+         "required": false
+       }
+     ]
+   }
+ }
