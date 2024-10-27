@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '@/pages/api/model/chat-store';
 import Companion3D from '@/components/Companion3D';
 import ChatInput from '@/components/Chat';
+import SettingsPopup from '@/components/SettingsPopup';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 
 const Companion = () => {
    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
    const [isClient, setIsClient] = useState(false);
-   const { getCurrentUserMessages } = useChatStore();
+   const { getCurrentUserMessages, fetchCompanionName, companionName } = useChatStore();
    const { data: session } = useSession();
    const bottomRef = useRef(null);
 
@@ -16,6 +18,12 @@ const Companion = () => {
    useEffect(() => {
       setIsClient(true);
    }, []);
+
+   useEffect(() => {
+      if (session?.user?.email) {
+         fetchCompanionName(session.user.email);
+      }
+   }, [session?.user?.email, fetchCompanionName]);
 
    useEffect(() => {
       if (isSidebarOpen && bottomRef.current) {
@@ -53,19 +61,19 @@ const Companion = () => {
                            <div
                               key={idx}
                               className={`p-3 rounded-lg text-text ${msg.role === 'user'
-                                    ? 'bg-primary ml-4'
-                                    : 'bg-secondary mr-4'
+                                 ? 'bg-primary ml-4'
+                                 : 'bg-secondary mr-4'
                                  }`}
                            >
                               <p className="text-xs font-medium mb-1 opacity-70">
-                                 {msg.role === 'user' ? 'You' : 'Companion'}
+                                 {msg.role === 'user' ? 'You' : companionName || 'Companion'}
                               </p>
                               <p className="text-sm">{msg.content}</p>
                            </div>
                         ))}
                      </div>
                   ) : (
-                     <p className="text-center opacity-70 mt-4">No messages yet</p>
+                     <p className="text-center opacity-70 mt-4 text-text">No messages yet</p>
                   )}
                   <div ref={bottomRef} id="chat-bottom" />
                </div>
@@ -83,14 +91,24 @@ const Companion = () => {
       </>
    );
 
-   const HistoryToggleButton = () => (
-      <button
-         onClick={() => setIsSidebarOpen(true)}
-         className="fixed top-4 left-4 p-3 bg-primary hover:bg-secondary  
-        rounded-full shadow-lg backdrop-blur-sm transition-colors z-40"
-      >
-         <Image src="/chat-history.png" width={20} height={20} alt="Chat History" />
-      </button>
+   const ToggleButtonGroup = () => (
+      <div>
+         <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="fixed top-4 left-4 p-3 bg-primary hover:bg-secondary  
+         rounded-full shadow-lg backdrop-blur-sm transition-colors z-40"
+         >
+            <Image src="/chat-history.png" width={20} height={20} alt="Chat History" />
+         </button>
+         <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="fixed top-20 left-4  p-3 bg-primary hover:bg-secondary
+         rounded-full shadow-lg backdrop-blur-sm transition-colors z-40"
+         >
+            <Image src="/settings.png" width={20} height={20} alt="Settings" />
+         </button>
+
+      </div >
    );
 
    // Don't render anything until client-side hydration is complete
@@ -100,8 +118,13 @@ const Companion = () => {
 
    return (
       <div className="relative">
-         <HistoryToggleButton />
+         <ToggleButtonGroup />
          <ChatHistorySidebar />
+
+         <SettingsPopup 
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+         />
 
          <div className="m-auto p-auto">
             <Companion3D />
