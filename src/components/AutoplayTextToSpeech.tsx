@@ -53,12 +53,13 @@ const AutoplayTextToSpeech: React.FC<AutoplayTextToSpeechProps> = ({ text, voice
         };
         setAudio(newAudio);
 
-        // If user has granted permission, play automatically
-        const hasPermission = localStorage.getItem('audioPermission') === 'granted';
-        if (hasPermission) {
-          await newAudio.play().catch(console.error);
+         // Try to play automatically
+         try {
+          await newAudio.play();
+        } catch (error) {
+          console.error('Auto-play failed:', error);
+          // Keep the audio object alive for manual play button
         }
-
       } catch (error) {
         console.error('Error getting audio:', error);
         setError(error instanceof Error ? error.message : 'Error loading audio');
@@ -86,7 +87,6 @@ const AutoplayTextToSpeech: React.FC<AutoplayTextToSpeechProps> = ({ text, voice
     
     try {
       await audio.play();
-      localStorage.setItem('audioPermission', 'granted');
     } catch (error) {
       console.error('Error playing audio:', error);
       setError('Failed to play audio');
@@ -115,7 +115,7 @@ const AutoplayTextToSpeech: React.FC<AutoplayTextToSpeechProps> = ({ text, voice
     );
   }
 
-  if (audioUrl && audio && !localStorage.getItem('audioPermission')) {
+  if (audioUrl && audio && audio.paused) {
     return (
       <button
         onClick={handlePlay}

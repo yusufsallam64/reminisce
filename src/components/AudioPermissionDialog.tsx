@@ -6,6 +6,8 @@ interface AudioPermissionDialogProps {
 }
 
 const AudioPermissionDialog: React.FC<AudioPermissionDialogProps> = ({ onAllow, onDeny }) => {
+  
+  
   return (
     <>
       {/* Backdrop */}

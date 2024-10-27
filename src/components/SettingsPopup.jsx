@@ -3,7 +3,7 @@ import { signOut } from 'next-auth/react';
 
 const SettingsPopup = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
-
+  
   return (
     <>
       {/* Backdrop */}

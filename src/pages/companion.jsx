@@ -13,27 +13,52 @@ const Companion = () => {
    const [isClient, setIsClient] = useState(false);
    const { getCurrentUserMessages, fetchCompanionName, companionName } = useChatStore();
    const { data: session } = useSession();
-   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+   const [showPermissionDialog, setShowPermissionDialog] = useState(true);
    const bottomRef = useRef(null);
 
-   useEffect(() => {
-      const hasSeenDialog = localStorage.getItem('hasSeenAudioDialog') === 'true';
-      if (!hasSeenDialog) {
-        setShowPermissionDialog(true);
-      }
-    }, []);
+   // Create a very short, silent audio blob once
+   const silentAudioBlob = new Blob(
+   [new Uint8Array([255, 227, 24, 196, 0, 0, 0, 3, 72, 1, 64, 0, 0, 4, 132, 16, 31, 227, 192]).buffer], 
+   { type: 'audio/mpeg' }
+   );
+   const silentAudioUrl = URL.createObjectURL(silentAudioBlob);
 
-    const handleAllowAudio = () => {
-      localStorage.setItem('audioPermission', 'granted');
-      localStorage.setItem('hasSeenAudioDialog', 'true');
-      setShowPermissionDialog(false);
-    };
-  
-    const handleDenyAudio = () => {
-      localStorage.setItem('audioPermission', 'denied');
-      localStorage.setItem('hasSeenAudioDialog', 'true');
-      setShowPermissionDialog(false);
-    };
+   const handleAllowAudio = async () => {
+      try {
+      const audio = new Audio(silentAudioUrl);
+      audio.volume = 0.01; // Nearly silent
+      
+      // Set very short duration and immediately stop after starting
+      const playPromise = audio.play();
+      setShowPermissionDialog(false); // Hide dialog immediately for responsiveness
+      
+      await playPromise;
+      setTimeout(() => {
+         audio.pause();
+         audio.remove();
+      }, 1);
+      
+      } catch (error) {
+      console.error('Permission error:', error);
+      }
+   };
+
+
+   // const handleAllowAudio = () => {
+   //    // Create and play a silent audio to trigger permission
+   //    const audio = new Audio();
+   //    audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+   //    audio.play().then(() => {
+   //       setShowPermissionDialog(false);
+   //    }).catch((error) => {
+   //       console.error('Permission error:', error);
+   //       setShowPermissionDialog(false);
+   //    });
+   // };
+
+   const handleDenyAudio = () => {
+   setShowPermissionDialog(false);
+   };
   
 
    // Handle client-side mounting
