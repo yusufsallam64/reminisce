@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import companionQuestions from '@/data/companionQuestions.json';
 
+import AudioRecorder from '@/components/AudioRecorder';
+
 const CreateCompanionForm = () => {
    const router = useRouter();
    const [isSubmitting, setIsSubmitting] = useState(false);
@@ -182,6 +184,8 @@ const CreateCompanionForm = () => {
                         {questions.map(question => renderQuestion(question))}
                      </div>
                   ))}
+
+                  <AudioRecorder />
 
                   <div className="flex justify-end">
                      <button
