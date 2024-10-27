@@ -5,6 +5,7 @@ import ChatInput from '@/components/Chat';
 import SettingsPopup from '@/components/SettingsPopup';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
+import AudioPermissionDialog from '@/components/AudioPermissionDialog';
 
 const Companion = () => {
    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -12,7 +13,28 @@ const Companion = () => {
    const [isClient, setIsClient] = useState(false);
    const { getCurrentUserMessages, fetchCompanionName, companionName } = useChatStore();
    const { data: session } = useSession();
+   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
    const bottomRef = useRef(null);
+
+   useEffect(() => {
+      const hasSeenDialog = localStorage.getItem('hasSeenAudioDialog') === 'true';
+      if (!hasSeenDialog) {
+        setShowPermissionDialog(true);
+      }
+    }, []);
+
+    const handleAllowAudio = () => {
+      localStorage.setItem('audioPermission', 'granted');
+      localStorage.setItem('hasSeenAudioDialog', 'true');
+      setShowPermissionDialog(false);
+    };
+  
+    const handleDenyAudio = () => {
+      localStorage.setItem('audioPermission', 'denied');
+      localStorage.setItem('hasSeenAudioDialog', 'true');
+      setShowPermissionDialog(false);
+    };
+  
 
    // Handle client-side mounting
    useEffect(() => {
@@ -118,6 +140,13 @@ const Companion = () => {
 
    return (
       <div className="relative">
+         {showPermissionDialog && (
+            <AudioPermissionDialog 
+               onAllow={handleAllowAudio}
+               onDeny={handleDenyAudio}
+            />
+         )}
+
          <ToggleButtonGroup />
          <ChatHistorySidebar />
 
