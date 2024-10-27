@@ -163,7 +163,7 @@ const CreateCompanionForm = () => {
          }
 
          const data = await response.json();
-         router.push('/chat');
+         router.push('/companion');
       } catch (error) {
          console.error('Error creating companion:', error);
          setError('Failed to create companion. Please try again.');
@@ -187,6 +187,17 @@ const CreateCompanionForm = () => {
 
                   <AudioRecorder />
 
+                  <div className=" border-accent border-t-2">
+                     <label className=" mt-5 block text-base font-semibold text-text mb-1">
+                        Companion Name
+                     </label>
+                     <input
+                        type="text"
+                        value={formData.companionName}
+                        onChange={(e) => handleChange('companionName', e.target.value)}
+                        className="w-full p-2 bg-primary rounded-md text-text placeholder:text-text focus:ring-primary-500 focus:border-primary-500"
+                     />
+                  </div>
                   <div className="flex justify-end">
                      <button
                         type="submit"

@@ -1,6 +1,108 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
+import { useChatStore } from '@/pages/api/model/chat-store';
+import { useSession } from 'next-auth/react';
 import * as THREE from 'three';
+
+const SpeechHandler = ({ isListening, setIsListening }) => {
+  const recognition = useRef(null);
+  const { addMessage,currentUserId, getCurrentUserMessages, addResponse } = useChatStore();
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { data: session } = useSession();
+  const startTimeRef = useRef(null);
+
+  const handleApiCall = async (transcript) => {
+    if (!session?.user?.email) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/model/cf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: session.user.email,
+          conversationMessages: getCurrentUserMessages(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      const data = await response.json();
+      addResponse(session.user.email, data.modelResponse);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('API call error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (window.webkitSpeechRecognition) {
+      recognition.current = new window.webkitSpeechRecognition();
+      recognition.current.continuous = true;
+      recognition.current.interimResults = false;
+
+      recognition.current.onstart = () => {
+        startTimeRef.current = Date.now();
+      };
+
+      recognition.current.onresult = async (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        const duration = (Date.now() - startTimeRef.current) / 1000; 
+        console.log('Speech recognition result:', transcript);
+        
+        if (transcript.trim() && duration > 3) {
+          // Add user message to chat store
+          addMessage(currentUserId, {
+            role: 'user',
+            content: transcript,
+          });
+          
+          // Make API call with the transcript
+          await handleApiCall(transcript);
+        }
+      };
+
+      recognition.current.onend = () => {
+        const duration = (Date.now() - startTimeRef.current) / 1000;
+        console.log('Speech recognition ended. Duration:', duration, 'seconds');
+        setIsListening(false);
+        startTimeRef.current = null;
+      };
+
+
+      recognition.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        setError('Speech recognition error occurred');
+        startTimeRef.current = null;
+      };
+    }
+
+    return () => {
+      if (recognition.current) {
+        recognition.current.stop();
+      }
+      startTimeRef.current = null;
+    };
+  }, [addMessage, setIsListening, session]);
+
+  useEffect(() => {
+    if (isListening && recognition.current) {
+      recognition.current.start();
+    } else if (!isListening && recognition.current) {
+      recognition.current.stop();
+    }
+  }, [isListening]);
+
+  return null;
+};
 
 const OrbitalPaths = () => {
   const pathsRef = useRef();
@@ -44,7 +146,7 @@ const OrbitalPaths = () => {
     const average = dataArray.reduce((acc, val) => acc + val, 0) / dataArray.length;
     
     // Normalize between 1 and 2 with some dampening
-    return 1 + (average / 120) * 1;
+    return 1 + (average / 255) * 0.5;
   };
 
   const fragmentShader = `
@@ -93,8 +195,8 @@ const OrbitalPaths = () => {
       materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
     }
     if (pathsRef.current) {
-      pathsRef.current.rotation.y += 0.001;
-      pathsRef.current.rotation.z += 0.0005;
+      pathsRef.current.rotation.y += 0.008;
+      pathsRef.current.rotation.z += 0.005;
     }
 
     // Update scale factors based on audio level
@@ -155,30 +257,38 @@ const OrbitalPaths = () => {
   );
 };
 
-// CoreParticle component remains exactly the same
-const CoreParticle = () => {
+// CoreParticle component modified to handle clicks
+const CoreParticle = ({ setIsListening, isListening }) => {
   const coreRef = useRef();
   const glowRef = useRef();
 
   useFrame((state) => {
     if (coreRef.current) {
-      const pulse = Math.sin(state.clock.elapsedTime * 2) * 0.1;
+      const pulseIntensity = isListening ? 0.2 : 0.1;
+      const pulseSpeed = isListening ? 4 : 2;
+      const pulse = Math.sin(state.clock.elapsedTime * pulseSpeed) * pulseIntensity;
       coreRef.current.scale.set(1 + pulse, 1 + pulse, 1 + pulse);
     }
     if (glowRef.current) {
-      const glowPulse = Math.sin(state.clock.elapsedTime * 2) * 0.15 + 1.15;
+      const glowPulseIntensity = isListening ? 0.25 : 0.15;
+      const glowPulse = Math.sin(state.clock.elapsedTime * 2) * glowPulseIntensity + 1.15;
       glowRef.current.scale.set(glowPulse, glowPulse, glowPulse);
     }
   });
 
+  const handleClick = (e) => {
+    e.stopPropagation();
+    setIsListening(prev => !prev);
+  };
+
   return (
-    <group>
+    <group onClick={handleClick} style={{ cursor: 'pointer' }}>
       <mesh ref={coreRef}>
         <sphereGeometry args={[0.12, 32, 32]} />
         <meshPhongMaterial
-          color="#D48311"
-          emissive="#D48311"
-          emissiveIntensity={2}
+          color={isListening ? "#FF6B6B" : "#D48311"}
+          emissive={isListening ? "#FF6B6B" : "#D48311"}
+          emissiveIntensity={isListening ? 3 : 2}
           transparent
           opacity={0.9}
         />
@@ -187,9 +297,9 @@ const CoreParticle = () => {
       <mesh ref={glowRef}>
         <sphereGeometry args={[0.15, 32, 32]} />
         <meshPhongMaterial
-          color="#D48311"
-          emissive="#D48311"
-          emissiveIntensity={1.5}
+          color={isListening ? "#FF6B6B" : "#D48311"}
+          emissive={isListening ? "#FF6B6B" : "#D48311"}
+          emissiveIntensity={isListening ? 2 : 1.5}
           transparent
           opacity={0.4}
         />
@@ -198,9 +308,9 @@ const CoreParticle = () => {
       <mesh>
         <sphereGeometry args={[0.2, 32, 32]} />
         <meshPhongMaterial
-          color="#D48311"
-          emissive="#D48311"
-          emissiveIntensity={1}
+          color={isListening ? "#FF6B6B" : "#D48311"}
+          emissive={isListening ? "#FF6B6B" : "#D48311"}
+          emissiveIntensity={isListening ? 1.5 : 1}
           transparent
           opacity={0.2}
         />
@@ -210,8 +320,11 @@ const CoreParticle = () => {
 };
 
 const Companion3D = () => {
+  const [isListening, setIsListening] = useState(false);
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-background">
+      <SpeechHandler isListening={isListening} setIsListening={setIsListening} />
       <div className="w-[600px] h-[600px]">
         <Canvas 
           camera={{ 
@@ -225,11 +338,16 @@ const Companion3D = () => {
           <pointLight position={[10, 10, 10]} intensity={0.5} />
           <pointLight position={[-10, -10, -10]} intensity={0.3} />
           <group scale={0.5}>
-            <CoreParticle />
+            <CoreParticle isListening={isListening} setIsListening={setIsListening} />
             <OrbitalPaths />
           </group>
         </Canvas>
       </div>
+      {isListening && (
+        <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-primary text-text px-4 py-2 rounded-full shadow-lg">
+          Listening... (Click again to stop)
+        </div>
+      )}
     </div>
   );
 };

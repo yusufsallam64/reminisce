@@ -12,6 +12,7 @@ type LovedOne = {
 type CompanionData = {
   userId: string;
   createdAt: Date;
+  companionName: string;
   lovedOnes: LovedOne[];
   masterPrompt: string;
   [key: string]: any;
@@ -103,6 +104,7 @@ export default async function handler(
     // Create the companion document with the master prompt
     const companionData = {
       userId: session.user.email,
+      companionName: formData.companionName,
       createdAt: new Date(),
       masterPrompt: masterPrompt
     };

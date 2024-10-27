@@ -7,7 +7,7 @@ const ChatInput = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { addMessage, addResponse, currentUserId, getCurrentUserMessages } = useChatStore();
+  const { addMessage, addResponse, currentUserId, getCurrentUserMessages, companionName } = useChatStore();
   const { data: session } = useSession();
 
   useEffect(() => {
@@ -72,7 +72,7 @@ const ChatInput = () => {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 p-4">
+    <div className="fixed bottom-0 left-0 right-0 p-7">
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
         <div className="flex gap-4">
           <div className="flex-1">
@@ -81,7 +81,7 @@ const ChatInput = () => {
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type your message..."
+                placeholder={"Send a message to " + companionName} 
                 className="w-full p-3 pr-12 rounded-lg border border-accent bg-primary shadow-md shadow-primary outline-none text-text font-semibold placeholder:text-text placeholder:font-normal"
                 disabled={isLoading || !currentUserId}
               />
