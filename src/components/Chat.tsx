@@ -74,7 +74,7 @@ const ChatInput = () => {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 p-4">
+    <div className="fixed bottom-0 left-0 right-0 p-7">
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
         <div className="flex gap-4">
           <div className="flex-1">
