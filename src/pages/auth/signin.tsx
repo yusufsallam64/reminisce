@@ -3,6 +3,7 @@ import {getProviders} from "next-auth/react";
 import {getServerSession} from "next-auth/next";
 import {authOptions} from "../api/auth/[...nextauth]";
 import AuthProviderBlock from "@/components/auth/AuthProviderBlock";
+import client from '@/lib/db/client'; 
 
 const SignIn = ({
     providers
@@ -43,13 +44,18 @@ const SignIn = ({
 export async function getServerSideProps(context: GetServerSidePropsContext) {
     const session = await getServerSession(context.req, context.res, authOptions);
 
+    const db = (await client.connect()).db("DB");
     // If the user is already logged in, redirect.
     // Note: Make sure not to redirect to the same page
     // To avoid an infinite loop!
     if (session) {
-        return {redirect: {destination: "/"}};
-    }
-
+        if(await db.collection("Companions").findOne({userId: session.user?.email})) {
+            return {redirect: {destination: "/companion"}};
+        } else {
+            return {redirect: {destination: "/create-companion"}};
+        }
+    } 
+    
     const providers = await getProviders();
 
     // TODO --> If no providers, this should error or something

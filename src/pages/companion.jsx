@@ -6,6 +6,9 @@ import SettingsPopup from '@/components/SettingsPopup';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import AudioPermissionDialog from '@/components/AudioPermissionDialog';
+import {getServerSession} from "next-auth/next";
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import client from '@/lib/db/client'; 
 
 const Companion = () => {
    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -43,24 +46,10 @@ const Companion = () => {
       }
    };
 
-
-   // const handleAllowAudio = () => {
-   //    // Create and play a silent audio to trigger permission
-   //    const audio = new Audio();
-   //    audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-   //    audio.play().then(() => {
-   //       setShowPermissionDialog(false);
-   //    }).catch((error) => {
-   //       console.error('Permission error:', error);
-   //       setShowPermissionDialog(false);
-   //    });
-   // };
-
    const handleDenyAudio = () => {
-   setShowPermissionDialog(false);
+      setShowPermissionDialog(false);
    };
   
-
    // Handle client-side mounting
    useEffect(() => {
       setIsClient(true);
@@ -187,5 +176,23 @@ const Companion = () => {
       </div>
    );
 };
+
+export async function getServerSideProps(context) {
+   const session = await getServerSession(context.req, context.res, authOptions);
+
+   const db = (await client.connect()).db("DB");
+   // If the user is already logged in, redirect.
+   // Note: Make sure not to redirect to the same page
+   // To avoid an infinite loop!
+   if (session) {
+       if(await db.collection("Companions").findOne({userId: session.user?.email})) {
+         return {props: {}};
+       } else {
+         return {redirect: {destination: "/create-companion"}};
+       }
+   } else {
+      return {redirect: {destination: "/"}};
+   }
+}
 
 export default Companion;

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import companionQuestions from '@/data/companionQuestions.json';
+import {getServerSession} from "next-auth/next";
+import client from '@/lib/db/client'; 
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 import AudioRecorder from '@/components/AudioRecorder';
 
@@ -224,5 +227,23 @@ const CreateCompanionForm = () => {
       </div>
    );
 };
+
+export async function getServerSideProps(context) {
+   const session = await getServerSession(context.req, context.res, authOptions);
+
+   const db = (await client.connect()).db("DB");
+   // If the user is already logged in, redirect.
+   // Note: Make sure not to redirect to the same page
+   // To avoid an infinite loop!
+   if (session) {
+       if(await db.collection("Companions").findOne({userId: session.user?.email})) {
+         return {redirect: {destination: "/companion"}};
+       } else {
+         return {props: {}};
+       }
+   } else {
+      return {redirect: {destination: "/"}};
+   }
+}
 
 export default CreateCompanionForm;

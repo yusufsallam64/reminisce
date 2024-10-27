@@ -1,9 +1,11 @@
 import React from 'react';
-import { signIn } from 'next-auth/react';
 import LandingModel from '@/components/LandingModel';
 import Typewriter from 'typewriter-effect';
+import { useRouter } from 'next/router';
+
 
 export default function LandingPage() {
+  const router = useRouter();
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-primary/30 flex items-center justify-center p-4">
       <div className="max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
@@ -21,7 +23,7 @@ export default function LandingPage() {
           </div>
 
           <button
-            onClick={() => signIn('google', { callbackUrl: '/' })}
+            onClick={() => { router.push('/auth/signin') }}
             className="flex items-center justify-center gap-2 bg-secondary text-gray-900 font-semibold px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-shadow w-60 group"
           >
             <img
