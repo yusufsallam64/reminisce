@@ -419,7 +419,7 @@ const Companion3D = () => {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-background">
+    <div className="fixed inset-0 flex items-center justify-center bg-background pb-20 pt-2">
       <SpeechHandler 
         isListening={isListening} 
         setIsListening={setIsListening}
