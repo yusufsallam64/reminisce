@@ -95,21 +95,6 @@ const ChatInput = () => {
     }
   }, [message, currentUserId, addMessage, addResponse, getCurrentUserMessages]);
 
-  if (!session?.user?.email) {
-    return (
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <Link 
-            href="/auth/signin" 
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            Sign in to chat
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed bottom-0 left-0 right-0 p-7">
       {lastResponse && voiceId && (
