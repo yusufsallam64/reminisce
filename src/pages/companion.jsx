@@ -9,6 +9,7 @@ import AudioPermissionDialog from '@/components/AudioPermissionDialog';
 import {getServerSession} from "next-auth/next";
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import client from '@/lib/db/client'; 
+import { signOut } from 'next-auth/react';
 
 const Companion = () => {
    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -137,11 +138,11 @@ const Companion = () => {
             <Image src="/chat-history.png" width={20} height={20} alt="Chat History" />
          </button>
          <button
-            onClick={() => setIsSettingsOpen(true)}
+            onClick={() => signOut({ callbackUrl: '/' })}
             className="fixed top-20 left-4  p-3 bg-primary hover:bg-secondary
          rounded-full shadow-lg backdrop-blur-sm transition-colors z-40"
          >
-            <Image src="/settings.png" width={20} height={20} alt="Settings" />
+            <Image src="/open-exit-door.png" width={20} height={20} alt="Sign Out" />
          </button>
 
       </div >
