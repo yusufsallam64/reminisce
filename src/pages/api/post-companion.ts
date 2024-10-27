@@ -104,6 +104,7 @@ export default async function handler(
     // Create the companion document with the master prompt
     const companionData = {
       userId: session.user.email,
+      voiceId: formData.voiceId,
       companionName: formData.companionName,
       createdAt: new Date(),
       masterPrompt: masterPrompt

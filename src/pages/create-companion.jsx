@@ -9,6 +9,8 @@ const CreateCompanionForm = () => {
    const [isSubmitting, setIsSubmitting] = useState(false);
    const [error, setError] = useState('');
 
+   const [voiceId, setVoiceId] = useState(null);
+
    const initialState = Object.entries(companionQuestions).reduce((acc, [category, { questions }]) => {
       questions.forEach(q => {
          if (q.type === 'loved-ones') {
@@ -117,7 +119,7 @@ const CreateCompanionForm = () => {
                   <button
                      type="button"
                      onClick={addLovedOne}
-                     className="mt-2 text-base text-text hover:text-primary-800 bg-secondary p-2 rounded-md"
+                     className="mt-2 text-base text-text border border-secondary hover:bg-primary hover:active:bg-secondary transition-all p-2 px-4 rounded-md"
                   >
                      + Add another loved one
                   </button>
@@ -147,7 +149,12 @@ const CreateCompanionForm = () => {
       setIsSubmitting(true);
       setError('');
 
-      console.log(formData);
+      const submissionData = {
+         ...formData,
+         voiceId: voiceId // Make sure voiceId is included in submission
+      };
+
+      console.log(submissionData);
 
       try {
          const response = await fetch('/api/post-companion', {
@@ -155,7 +162,7 @@ const CreateCompanionForm = () => {
             headers: {
                'Content-Type': 'application/json',
             },
-            body: JSON.stringify(formData),
+            body: JSON.stringify(submissionData),
          });
 
          if (!response.ok) {
@@ -175,7 +182,7 @@ const CreateCompanionForm = () => {
 
    return (
       <div className="max-w-3xl mx-auto p-6">
-         <div className=" rounded-lg shadow-lg">
+         <div className=" rounded-lg">
             <div className="p-6">
                <form onSubmit={handleSubmit} className="space-y-8">
                   {Object.entries(companionQuestions).map(([category, { title, questions }]) => (
@@ -184,10 +191,9 @@ const CreateCompanionForm = () => {
                         {questions.map(question => renderQuestion(question))}
                      </div>
                   ))}
-
-                  <AudioRecorder />
-
-                  <div className=" border-accent border-t-2">
+                  
+                  <div>
+                     <SectionTitle>Companion Customization</SectionTitle>
                      <label className=" mt-5 block text-base font-semibold text-text mb-1">
                         Companion Name
                      </label>
@@ -197,12 +203,17 @@ const CreateCompanionForm = () => {
                         onChange={(e) => handleChange('companionName', e.target.value)}
                         className="w-full p-2 bg-primary rounded-md text-text placeholder:text-text focus:ring-primary-500 focus:border-primary-500"
                      />
+
+                     <label className=" mt-5 block text-base font-semibold text-text mb-1">
+                        Companion Voice
+                     </label>
+                     <AudioRecorder setVoiceId={setVoiceId} />
                   </div>
                   <div className="flex justify-end">
                      <button
                         type="submit"
-                        disabled={isSubmitting}
-                        className="bg-primary text-accent px-6 py-2 rounded-md hover:opacity-80 transition-opacity ease-in duration-300 font-semibold disabled:opacity-50"
+                        disabled={isSubmitting || !voiceId || !formData.companionName} 
+                        className="text-text border border-secondary px-6 py-2 rounded-md transition-opacity ease-in duration-300 font-semibold disabled:opacity-50 hover:enabled:bg-primary active:enabled:bg-secondary"
                      >
                         {isSubmitting ? 'Creating...' : 'Create Companion'}
                      </button>

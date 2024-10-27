@@ -11,7 +11,7 @@ const MicIcon = () => (
 );
 
 const StopIcon = () => (
-  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" strokeWidth="2">
+  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="red" strokeWidth="0">
     <rect x="6" y="6" width="12" height="12"/>
   </svg>
 );
@@ -40,7 +40,11 @@ const SpinnerIcon = () => (
   </svg>
 );
 
-const AudioRecorder = () => {
+interface AudioRecorderProps {
+  setVoiceId: (voiceId: string) => void;
+}
+
+const AudioRecorder: React.FC<AudioRecorderProps> = ({ setVoiceId }) => {
   const HIGH_QUALITY_AUDIO_CONSTRAINTS = {
     audio: {
       echoCancellation: true,
@@ -281,7 +285,8 @@ const AudioRecorder = () => {
     recordings.forEach(recording => URL.revokeObjectURL(recording.url));
     setRecordings([]);
     setTotalDuration(0);
-    
+    setVoiceId(data.voice_id);
+
     alert('High quality voice samples uploaded successfully!');
   } catch (err) {
     console.error('Error uploading to ElevenLabs:', err);
@@ -323,18 +328,24 @@ const AudioRecorder = () => {
   }, [recordings]);
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
+    <div className="w-full rounded-lg">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-2">Voice Recorder</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Record 2 samples of up to 60 seconds each for voice cloning
+        <p className="text-sm text-text">
+          Record 2 samples of up to 60 seconds each for voice cloning. 
+        </p>
+        <p className="text-sm text-text">
+          Please speak clearly and in a normal tone with no background noise.
+        </p>
+        <p className="text-sm text-text mb-4">
+          By recording these samples, you consent to the replication and use of your voice for this product.
         </p>
         
         <div className="flex justify-between items-center mb-4">
           <button
             onClick={isRecording ? handleStopRecording : handleStartRecording}
             disabled={recordings.length >= 2 || isUploading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            type='button'
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border-secondary border hover:enabled:bg-primary hover:active:enabled:bg-secondary text-text disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isRecording ? (
               <>
@@ -357,7 +368,7 @@ const AudioRecorder = () => {
 
         <div className="space-y-3">
           {recordings.map(({ url }, index) => (
-            <div key={index} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+            <div key={index} className="flex items-center gap-2 p-3 border border-secondary rounded-lg">
               <audio 
                 src={url} 
                 controls 
@@ -368,6 +379,7 @@ const AudioRecorder = () => {
                 onClick={() => handleDeleteRecording(index)}
                 className="p-2 text-red-500 hover:text-red-600 transition-colors"
                 aria-label="Delete recording"
+                type='button'
               >
                 <TrashIcon />
               </button>
@@ -379,7 +391,8 @@ const AudioRecorder = () => {
       <button
         onClick={handleUpload}
         disabled={recordings.length < 1 || totalDuration < MINIMUM_TOTAL_DURATION || isUploading}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        type='button'
+        className="w-full flex items-center justify-center gap-2 px-4 py-2 border-secondary border hover:enabled:bg-primary hover:active:enabled:bg-secondary text-text rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {isUploading ? (
           <>
