@@ -1,9 +1,8 @@
-'use client';
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { useChatStore } from '@/pages/api/model/chat-store';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import AutoplayTextToSpeech from './AutoplayTextToSpeech';
 
 const ChatInput = () => {
   const [message, setMessage] = useState('');
@@ -11,6 +10,36 @@ const ChatInput = () => {
   const [error, setError] = useState('');
   const { addMessage, addResponse, currentUserId, getCurrentUserMessages, companionName } = useChatStore();
   const { data: session } = useSession();
+  const [voiceId, setVoiceId] = useState<string | null>(null);
+  const [lastResponse, setLastResponse] = useState<string | null>(null);
+  
+  // Fetch voice ID on component mount
+  useEffect(() => {
+    const fetchVoiceId = async () => {
+      if (!session?.user?.email) return;
+      
+      try {
+        const response = await fetch('/api/get-companion-voice', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId: session.user.email }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch voice ID');
+        
+        const data = await response.json();
+
+        console.log("Found Voice ID: ", data.companionVoiceId);
+        setVoiceId(data.companionVoiceId);
+      } catch (error) {
+        console.error('Error fetching voice ID:', error);
+      }
+    };
+
+    fetchVoiceId();
+  }, [session?.user?.email]);
 
   useEffect(() => {
     const userId = session?.user?.email as string;
@@ -26,13 +55,13 @@ const ChatInput = () => {
     setIsLoading(true);
     setError('');
     
-    // Add user message to store
-    addMessage(currentUserId, {
-      role: 'user',
-      content: message.trim(),
-    });
-
     try {
+      // Add user message to store
+      addMessage(currentUserId, {
+        role: 'user',
+        content: message.trim(),
+      });
+
       const response = await fetch('/api/model/cf', {
         method: 'POST',
         headers: {
@@ -49,8 +78,16 @@ const ChatInput = () => {
       }
 
       const data = await response.json();
-      addResponse(currentUserId, data.modelResponse);
+      
+      // Clear the input first
       setMessage('');
+      
+      // Add the response to the store
+      addResponse(currentUserId, data.modelResponse);
+      
+      // Trigger audio playback
+      setLastResponse(data.modelResponse);
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -75,6 +112,13 @@ const ChatInput = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 p-7">
+      {lastResponse && voiceId && (
+        <AutoplayTextToSpeech 
+          text={lastResponse} 
+          voiceId={voiceId}
+          key={lastResponse} // Force new instance on new response
+        />
+      )}
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
         <div className="flex gap-4">
           <div className="flex-1">

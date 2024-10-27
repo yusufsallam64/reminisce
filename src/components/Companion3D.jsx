@@ -3,10 +3,11 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useChatStore } from '@/pages/api/model/chat-store';
 import { useSession } from 'next-auth/react';
 import * as THREE from 'three';
+import AutoplayTextToSpeech from './AutoplayTextToSpeech';
 
-const SpeechHandler = ({ isListening, setIsListening }) => {
+const SpeechHandler = ({ isListening, setIsListening, voiceId, setLastResponse, hasAudioPermission }) => {
   const recognition = useRef(null);
-  const { addMessage,currentUserId, getCurrentUserMessages, addResponse } = useChatStore();
+  const { addMessage, currentUserId, getCurrentUserMessages, addResponse } = useChatStore();
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const { data: session } = useSession();
@@ -27,13 +28,14 @@ const SpeechHandler = ({ isListening, setIsListening }) => {
           conversationMessages: getCurrentUserMessages(),
         }),
       });
-
+  
       if (!response.ok) {
         throw new Error('Failed to send message');
       }
-
+  
       const data = await response.json();
       addResponse(session.user.email, data.modelResponse);
+      setLastResponse(data.modelResponse);  // Add this line
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       console.error('API call error:', err);
@@ -43,7 +45,7 @@ const SpeechHandler = ({ isListening, setIsListening }) => {
   };
 
   useEffect(() => {
-    if (window.webkitSpeechRecognition) {
+    if (window.webkitSpeechRecognition && hasAudioPermission) {
       recognition.current = new window.webkitSpeechRecognition();
       recognition.current.continuous = true;
       recognition.current.interimResults = false;
@@ -91,7 +93,7 @@ const SpeechHandler = ({ isListening, setIsListening }) => {
       }
       startTimeRef.current = null;
     };
-  }, [addMessage, setIsListening, session]);
+  }, [addMessage, setIsListening, session, hasAudioPermission]);
 
   useEffect(() => {
     if (isListening && recognition.current) {
@@ -258,7 +260,7 @@ const OrbitalPaths = () => {
 };
 
 // CoreParticle component modified to handle clicks
-const CoreParticle = ({ setIsListening, isListening }) => {
+const CoreParticle = ({ isListening, onClick }) => {
   const coreRef = useRef();
   const glowRef = useRef();
 
@@ -282,7 +284,7 @@ const CoreParticle = ({ setIsListening, isListening }) => {
   };
 
   return (
-    <group onClick={handleClick} style={{ cursor: 'pointer' }}>
+    <group onClick={onClick} style={{ cursor: 'pointer' }}>
       <mesh ref={coreRef}>
         <sphereGeometry args={[0.12, 32, 32]} />
         <meshPhongMaterial
@@ -321,10 +323,110 @@ const CoreParticle = ({ setIsListening, isListening }) => {
 
 const Companion3D = () => {
   const [isListening, setIsListening] = useState(false);
+  const [voiceId, setVoiceId] = useState(null);
+  const [lastResponse, setLastResponse] = useState(null);
+  const [hasAudioPermission, setHasAudioPermission] = useState(false);
+  const { data: session } = useSession();
+
+  // Create a silent audio blob for permission request
+  const silentAudioBlob = new Blob(
+    [new Uint8Array([255, 227, 24, 196, 0, 0, 0, 3, 72, 1, 64, 0, 0, 4, 132, 16, 31, 227, 192]).buffer],
+    { type: 'audio/mpeg' }
+  );
+  const silentAudioUrl = URL.createObjectURL(silentAudioBlob);
+
+  // Check for existing audio permission on mount
+  useEffect(() => {
+    const checkAudioPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+        setHasAudioPermission(true);
+      } catch (error) {
+        console.error('No audio permission:', error);
+        setHasAudioPermission(false);
+      }
+    };
+
+    checkAudioPermission();
+  }, []);
+
+  // Fetch voice ID when session is available
+  useEffect(() => {
+    const fetchVoiceId = async () => {
+      if (!session?.user?.email) return;
+      
+      try {
+        const response = await fetch('/api/get-companion-voice', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId: session.user.email }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch voice ID');
+        
+        const data = await response.json();
+        setVoiceId(data.companionVoiceId);
+      } catch (error) {
+        console.error('Error fetching voice ID:', error);
+      }
+    };
+
+    fetchVoiceId();
+  }, [session?.user?.email]);
+
+  const requestAudioPermission = async () => {
+    try {
+      // Play silent audio to trigger permission
+      const audio = new Audio(silentAudioUrl);
+      audio.volume = 0.01;
+      
+      const playPromise = audio.play();
+      await playPromise;
+      
+      setTimeout(() => {
+        audio.pause();
+        audio.remove();
+      }, 1);
+
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      
+      setHasAudioPermission(true);
+      return true;
+    } catch (error) {
+      console.error('Permission error:', error);
+      setHasAudioPermission(false);
+      return false;
+    }
+  };
+
+  const handleCoreClick = async (e) => {
+    e.stopPropagation();
+    
+    if (!hasAudioPermission) {
+      const granted = await requestAudioPermission();
+      if (!granted) {
+        // Maybe show a notification to the user about needing permissions
+        return;
+      }
+    }
+
+    setIsListening(prev => !prev);
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-background">
-      <SpeechHandler isListening={isListening} setIsListening={setIsListening} />
+      <SpeechHandler 
+        isListening={isListening} 
+        setIsListening={setIsListening}
+        voiceId={voiceId}
+        setLastResponse={setLastResponse}
+        hasAudioPermission={hasAudioPermission}
+      />
       <div className="w-[600px] h-[600px]">
         <Canvas 
           camera={{ 
@@ -338,7 +440,10 @@ const Companion3D = () => {
           <pointLight position={[10, 10, 10]} intensity={0.5} />
           <pointLight position={[-10, -10, -10]} intensity={0.3} />
           <group scale={0.5}>
-            <CoreParticle isListening={isListening} setIsListening={setIsListening} />
+            <CoreParticle 
+              isListening={isListening} 
+              onClick={handleCoreClick}
+            />
             <OrbitalPaths />
           </group>
         </Canvas>
@@ -347,6 +452,13 @@ const Companion3D = () => {
         <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-primary text-text px-4 py-2 rounded-full shadow-lg">
           Listening... (Click again to stop)
         </div>
+      )}
+      {lastResponse && voiceId && (
+        <AutoplayTextToSpeech 
+          text={lastResponse} 
+          voiceId={voiceId}
+          key={lastResponse}
+        />
       )}
     </div>
   );

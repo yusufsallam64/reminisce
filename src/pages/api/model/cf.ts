@@ -68,7 +68,7 @@ export default async function handler(
 
 async function run(input: AIRequest): Promise<AIResponse> {
   const model = process.env.CF_LLM_MODEL;
-  console.log("Executing model with input: ", input);
+  // console.log("Executing model with input: ", input);
 
   // TODO --> Fine-tune parameters to get something a bit more suitable for this project
   // Potentially limit the max input tokens 
@@ -99,7 +99,7 @@ async function run(input: AIRequest): Promise<AIResponse> {
     }
 
     const result: AIResponse = await response.json();
-    console.log("Model response:", result);
+    // console.log("Model response:", result);
     return result;
   } catch (error) {
     if (error instanceof Error) {
