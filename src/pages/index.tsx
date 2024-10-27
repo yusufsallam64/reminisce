@@ -24,14 +24,9 @@ export default function LandingPage() {
 
           <button
             onClick={() => { router.push('/auth/signin') }}
-            className="flex items-center justify-center gap-2 bg-secondary text-gray-900 font-semibold px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-shadow w-60 group"
+            className="mt-2 text-white border border-accent hover:bg-accent transition-all p-2 px-4 rounded-md w-60"
           >
-            <img
-              src="/providers/google.png"
-              alt="Google"
-              className="w-5 h-5"
-            />
-            <span className="font-medium">Sign in with Google</span>
+            <span className="font-medium">Sign In</span>
           </button>
         </div>
 
