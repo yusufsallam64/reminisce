@@ -1,45 +1,67 @@
-import type {GetServerSidePropsContext, InferGetServerSidePropsType} from "next";
-import {getProviders} from "next-auth/react";
-import {getServerSession} from "next-auth/next";
-import {authOptions} from "../api/auth/[...nextauth]";
+import type { GetServerSidePropsContext, InferGetServerSidePropsType } from "next";
+import { getProviders } from "next-auth/react";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../api/auth/[...nextauth]";
 import AuthProviderBlock from "@/components/auth/AuthProviderBlock";
-import client from '@/lib/db/client'; 
+import client from '@/lib/db/client';
+import { useEffect, useState } from "react";
 
 const SignIn = ({
     providers
 }: InferGetServerSidePropsType<typeof getServerSideProps>): JSX.Element => {
+    const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
     return (
-        <div className="h-screen w-screen m-auto flex place-content-center bg-secondary-50">
-            <div className="flex flex-col place-content-center m-auto w-full h-screen">
-                <div className="w-5/6 sm:w-1/3 h-3/5 m-auto border border-accent-neutral/50 rounded-xl bg-secondary-100 shadow-2xl">
-                    <div className="h-1/4">
-                        <div className="bg-clip-text py-3 bg-primary-100 pt-8">
-                            <h1 className="text-center text-5xl font-extrabold">
-                                Dementia Friend
-                            </h1>
-                        </div>
-                        <h3 className="text-center text-2xl text-primary-75 font-semibold">
-                            Sign In
-                        </h3>
-                        <hr className="w-2/3 border-primary-100 mx-auto mt-4 mb-6"></hr>
-                    </div>
-                    <div className="flex flex-col h-3/4 py-8 place-content-start overflow-y-scroll space-y-4">
-                        <>
-                            {Object.values(providers).map((provider, idx) => (
-                                <AuthProviderBlock
-                                    key={provider.id}
-                                    providerName={provider.name}
-                                    iconLink={`/providers/${provider.id}.png`}
-                                    provider={provider}
-                                />
-                            ))}
-                        </>
-                    </div>
+        <div className="min-h-screen w-full relative overflow-hidden bg-background">
+            {/* Animated gradient background */}
+            <div
+                className="absolute inset-0 opacity-50"
+                style={{
+                    background: `radial-gradient(circle at ${50 + mousePosition.x * 10}% ${50 + mousePosition.y * 10}%, 
+                rgb(212, 131, 17) 0%,
+                rgba(105, 117, 101, 0.5) 25%,
+                rgba(40, 42, 39, 0.1) 50%)`
+                }}
+            />
+
+            {/* Content container */}
+            <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4">
+                {/* Logo and title section */}
+                <div className="text-center mb-12 space-y-4">
+                    <h1 className="text-6xl font-bold text-text">
+                        <span className="bg-gradient-to-r from-accent via-accent/80 to-secondary bg-clip-text text-transparent">
+                            Reminisce
+                        </span>
+                    </h1>
+                    <p className="text-xl text-text">
+                        Your companion in preserving memories
+                    </p>
                 </div>
+
+                {/* Providers section */}
+                <div className="w-full max-w-md space-y-4">
+                    {Object.values(providers).map((provider) => (
+                        <div
+                            key={provider.id}
+                            className="transform transition-all duration-300 hover:scale-105"
+                        >
+                            <AuthProviderBlock
+                                providerName={provider.name}
+                                iconLink={`/providers/${provider.id}.png`}
+                                provider={provider}
+                            />
+                        </div>
+                    ))}
+                </div>
+
+                {/* Decorative elements */}
+                <div className="absolute top-0 left-0 w-96 h-96 bg-accent/10 rounded-full filter blur-3xl" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-secondary/10 rounded-full filter blur-3xl" />
             </div>
         </div>
     );
 };
+
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
     const session = await getServerSession(context.req, context.res, authOptions);
@@ -49,18 +71,18 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     // Note: Make sure not to redirect to the same page
     // To avoid an infinite loop!
     if (session) {
-        if(await db.collection("Companions").findOne({userId: session.user?.email})) {
-            return {redirect: {destination: "/companion"}};
+        if (await db.collection("Companions").findOne({ userId: session.user?.email })) {
+            return { redirect: { destination: "/companion" } };
         } else {
-            return {redirect: {destination: "/create-companion"}};
+            return { redirect: { destination: "/create-companion" } };
         }
-    } 
-    
+    }
+
     const providers = await getProviders();
 
     // TODO --> If no providers, this should error or something
     return {
-        props: {providers: providers ?? []}
+        props: { providers: providers ?? [] }
     };
 }
 
