@@ -5,7 +5,7 @@ import Typewriter from 'typewriter-effect';
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary to-secondary/30 flex items-center justify-center p-4">
       <div className="max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
         {/* Left Column */}
         <div className="space-y-8 flex flex-col justify-center m-10">
@@ -20,7 +20,7 @@ export default function LandingPage() {
           
           <button
             onClick={() => signIn('google', { callbackUrl: '/' })}
-            className="flex items-center justify-center gap-2 bg-secondary text-gray-800 font-semibold px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-shadow w-60 group"
+            className="flex items-center justify-center gap-2 bg-secondary text-gray-900 font-semibold px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-shadow w-60 group"
           >
             <img
               src="/providers/google.png"
