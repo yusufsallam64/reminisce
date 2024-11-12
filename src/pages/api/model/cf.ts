@@ -30,6 +30,7 @@ export default async function handler(
 
   const { userId, conversationMessages } = req.body;
 
+  // TODO --> Fix this not awaiting the client.connect()
   const companion = await client.db("DB").collection("Companions").findOne({ userId: userId });
 
   console.log("Companion:", companion);
