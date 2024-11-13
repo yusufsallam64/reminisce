@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useChatStore } from '@/pages/api/model/chat-store';
 import { useSession } from 'next-auth/react';
-import Link from 'next/link';
 import AutoplayTextToSpeech from './AutoplayTextToSpeech';
 
 const ChatInput = () => {

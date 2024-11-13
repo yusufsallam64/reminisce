@@ -20,18 +20,23 @@ const AutoplayTextToSpeech: React.FC<AutoplayTextToSpeechProps> = ({ text, voice
         setIsLoading(true);
         setError(null);
         
+        if(process.env.NEXT_PUBLIC_ENABLE_VOICE_REPLICATION?.toLowerCase() !== 'true') {
+          console.error("Voice replication is disabled.");
+          return;
+        }
+
         const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'xi-api-key': process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY || '',
-          },
-          body: JSON.stringify({
-            text: text,
-            model_id: 'eleven_monolingual_v1',
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'xi-api-key': process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY || '',
+            },
+            body: JSON.stringify({
+              text: text,
+              model_id: 'eleven_monolingual_v1',
+              voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.75,
             },
           }),
         });
