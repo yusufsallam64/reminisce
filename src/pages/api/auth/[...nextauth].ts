@@ -28,6 +28,7 @@ export const authOptions: AuthOptions = {
         newUser: '/create-companion',
     },
     callbacks: {
+        // TODO --> investigate the bug with not refreshing the access token properly
         // Credential logic adapted from [next-auth example](https://authjs.dev/guides/refresh-token-rotation)
         async session({ session, user }) {
             await client.connect();
@@ -71,7 +72,7 @@ export const authOptions: AuthOptions = {
                     }
             
                     await db.collection("accounts").updateOne(
-                        { _id: googleAccount._id, provider: "google" },
+                        { _id: dbuser.userId, provider: "google" },
                         {
                             $set: {
                                 access_token: newTokens.access_token,
