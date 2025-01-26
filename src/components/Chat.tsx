@@ -42,12 +42,12 @@ const ChatInput = () => {
 
   useEffect(() => {
     const userId = session?.user?.email as string;
-    if (userId) {
-      useChatStore.getState().setCurrentUser(userId);
-    }
-  }, [session]);
+      if (userId) {
+        useChatStore.getState().setCurrentUser(userId);
+      }
+    }, [session]);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !currentUserId) return;
     
@@ -112,7 +112,7 @@ const ChatInput = () => {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder={"Send a message to " + companionName} 
-                className="w-full p-3 pr-12 rounded-lg border border-accent bg-primary shadow-md shadow-primary outline-none text-text font-semibold placeholder:text-text placeholder:font-normal"
+                className="w-full p-3 pr-12 rounded-lg border border-accent bg-primary shadow-md shadow-primary outline-none text-text placeholder:text-text placeholder:font-normal"
                 disabled={isLoading || !currentUserId}
               />
               {error && (
