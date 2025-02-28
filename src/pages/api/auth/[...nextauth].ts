@@ -32,7 +32,7 @@ export const authOptions: AuthOptions = {
         // Credential logic adapted from [next-auth example](https://authjs.dev/guides/refresh-token-rotation)
         async session({ session, user }) {
             await client.connect();
-            const db = client.db("test");
+            const db = client.db("accounts");
             const dbuser = await db.collection("users").findOne({ email: session.user?.email ?? "" });
             if (!dbuser) {
                 // TODO --> Create a new user or something on this...

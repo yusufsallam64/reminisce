@@ -1,154 +1,123 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { AIRequest, AIResponse, Message } from "./types";
+import { Message } from "./types";
 import client from "@/lib/db/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]";
 import { fetchCalendarEvents } from "../get-calendar-events";
+import { OpenAI } from "openai";
 
-if (!process.env.CF_API_TOKEN || !process.env.CF_ACCOUNT_ID) {
-  throw new Error("Missing required environment variables: CF_API_TOKEN and/or CF_ACCOUNT_ID");
-}
-
-if(!process.env.CF_LLM_MODEL) {
-  throw new Error("Missing required environment variable: CF_LLM_MODEL");
-}
-
-type Data = {
-  modelResponse: string;
-};
-
-interface CalEvents {
-  summary: string;
-  description: string;
-  location: string;
-  start: string;
-  end: string;
-}
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<Data>,
+  res: NextApiResponse
 ) {
-  if(!req.method || req.method !== "POST") {
-    res.status(405).json({modelResponse: "Method not allowed"});
+  if (!req.method || req.method !== "POST") {
+    res.status(405).json({ modelResponse: "Method not allowed" });
     return;
   }
 
-  if(!req.body || !req.body.conversationMessages) {
-    res.status(400).json({modelResponse: "Bad request"});
+  if (!req.body || !req.body.conversationMessages) {
+    res.status(400).json({ modelResponse: "Bad request" });
     return;
   }
 
   const { userId, conversationMessages } = req.body;
 
   const session = await getServerSession(req, res, authOptions);
-  if(!session?.user?.email) {
-    res.status(401).json({modelResponse: "Unauthorized"});
+  if (!session?.user?.email) {
+    res.status(401).json({ modelResponse: "Unauthorized" });
     return;
   }
 
-  if(userId !== session.user?.email) {
-    res.status(403).json({modelResponse: "Forbidden"});
+  if (userId !== session.user?.email) {
+    res.status(403).json({ modelResponse: "Forbidden" });
     return;
   }
 
-  // TODO --> Fix this not awaiting the client.connect()
-  const companion = await client.db("DB").collection("Companions").findOne({ userId: session.user?.email });
+  // Set headers for streaming
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+  });
 
-  const calendarInformation = await fetchCalendarEvents(userId);
-  
-  let calEvents: CalEvents[] = (calendarInformation ?? []).map((event: any) => {
+  try {
+    // Fetch companion data
+    const companion = await client.db("DB").collection("Companions").findOne({ userId: session.user?.email });
+    
+    // Fetch calendar events
+    const calendarInformation = await fetchCalendarEvents(userId);
+    
+    const calEvents = (calendarInformation ?? []).map((event: any) => {
       return {
         summary: event.summary,
         description: event.description,
         location: event.location,
         start: event.start.dateTime,
         end: event.end.dateTime,
-    }
-  });
-
-  const calEventMessages = "You will additionally be provided with information regarding upcoming events that the patient has. Ensure that you are reminding them of these events. \
-    Make sure that you tell them in natural language when these events are happening and how far away they are relative to the current time, which you will also be provided. \n \
-    If the user is asking for information regarding an event, be concise and do not provide distracting or extra, unnecesssary information. \
-    Current Time: " + new Date().toLocaleString() + " \ " +
-    calEvents.map((event) => {
-      return `Upcoming Event: ${event.summary} \nDescription: ${event.description} \nLocation: ${event.location} \nStart Time: ${event.start} \nEnd Time: ${event.end}`;
-    }).join("\n\n")
-
-
-  let messages: Message[] = [
-    {
-      role: "system",
-      content: (companion?.masterPrompt ?? " \
-        You are a close relative or companion of an individual with dementia. \
-        Your job is to help them remember important details about their life. \
-        Provide short, concise answers that provide them with companionship. \
-        Keep responses simple and avoid complex language. \
-        If the user demonstrates confusion, provide them with a reminder of the context. \
-        If they have any important reminders or duties that they must remember to perform, periodically include reminders within messages. \
-        The user may ask you to repeat information, so be prepared to do so. \
-        If the user's message contains any potentially distressed/sad/angry messages, work to alleviate these emotions and relax them.")
-        + calEventMessages, 
-        ...conversationMessages.slice(-8).map((message: any) => {
-        return {
-          role: message.role,
-          content: message.content,
-        };
-      })
-    }
-  ];  
-
-  const modelResponse = await run({ messages });
-    
-  if(!modelResponse.success) {
-    res.status(500).json({modelResponse: modelResponse.errors.map((error) => error.message).join(", ")});
-    return;
-  }
-
-  res.status(200).json({ modelResponse: modelResponse.result.response });
-  return;
-}
-
-async function run(input: AIRequest): Promise<AIResponse> {
-  const model = process.env.CF_LLM_MODEL;
-  // console.log("Executing model with input: ", input);
-
-  // TODO --> Fine-tune parameters to get something a bit more suitable for this project
-  // Potentially limit the max input tokens 
-  const requestBody = {
-    ...input,
-    max_tokens: 256,  
-    temperature: 0.3, // lower temperature = more deterministic (0.0 - 1.0)
-    top_p: 0.9,      // nucleus sampling (lower = more focused)
-    top_k: 40,       // vocab diversity
-    stream: false    
-  };
-
-  try {
-    const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/ai/run/${model}`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.CF_API_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        method: 'POST',
-        body: JSON.stringify(input),
       }
-    );
+    });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const calEventMessages = "You will additionally be provided with information regarding upcoming events that the patient has. Ensure that you are reminding them of these events. \
+      Make sure that you tell them in natural language when these events are happening and how far away they are relative to the current time, which you will also be provided. \n \
+      If the user is asking for information regarding an event, be concise and do not provide distracting or extra, unnecesssary information. \
+      Current Time: " + new Date().toLocaleString() + " \n" +
+      calEvents.map((event) => {
+        return `Upcoming Event: ${event.summary} \nDescription: ${event.description} \nLocation: ${event.location} \nStart Time: ${event.start} \nEnd Time: ${event.end}`;
+      }).join("\n\n");
+
+    const systemPrompt = (companion?.masterPrompt ?? " \
+      You are a close relative or companion of an individual with dementia. \
+      Your job is to help them remember important details about their life. \
+      Provide short, concise answers that provide them with companionship. \
+      Keep responses simple and avoid complex language. \
+      If the user demonstrates confusion, provide them with a reminder of the context. \
+      If they have any important reminders or duties that they must remember to perform, periodically include reminders within messages. \
+      The user may ask you to repeat information, so be prepared to do so. \
+      If the user's message contains any potentially distressed/sad/angry messages, work to alleviate these emotions and relax them.")
+      + calEventMessages;
+
+    // Prepare messages for OpenAI
+    const openaiMessages = [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      ...conversationMessages.slice(-8).map((message: any) => ({
+        role: message.role,
+        content: message.content,
+      })),
+    ];
+
+    // Create stream
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: openaiMessages,
+      stream: true,
+      temperature: 0.3,
+      max_tokens: 256,
+    });
+
+    let completeResponse = "";
+
+    // Process the stream
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || "";
+      completeResponse += content;
+      
+      // Send the chunk to the client
+      res.write(`data: ${JSON.stringify({ content, completeResponse })}\n\n`);
     }
 
-    const result: AIResponse = await response.json();
-    // console.log("Model response:", result);
-    return result;
+    // End the stream
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
   } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to run AI model: ${error.message}`);
-    }
-    throw error;
+    console.error("Error processing request:", error);
+    res.write(`data: ${JSON.stringify({ error: "An error occurred" })}\n\n`);
+    res.end();
   }
 }
-

@@ -13,13 +13,13 @@ if(!process.env.NEXTAUTH_URL) {
 }
 
 export async function fetchCalendarEvents(userEmail: string) {
-  const dbuser = await client.db("test").collection("users").findOne({ email: userEmail });
+  const dbuser = await client.db("accounts").collection("users").findOne({ email: userEmail });
   if (!dbuser) {
     console.error("User not found in database");
     return [];
   }
 
-  const dbaccount = await client.db("test").collection('accounts').findOne(({ userId: dbuser._id, provider: 'google' }));
+  const dbaccount = await client.db("accounts").collection('accounts').findOne(({ userId: dbuser._id, provider: 'google' }));
   const accessToken = dbaccount?.access_token;
   if(!accessToken) {
     console.error("No access token found.");

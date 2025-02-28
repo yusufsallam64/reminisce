@@ -1,16 +1,17 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useChatStore } from '@/pages/api/model/chat-store';
 import { useSession } from 'next-auth/react';
-import AutoplayTextToSpeech from './AutoplayTextToSpeech';
+import AutoplayTextToSpeech from './StreamingTextToSpeech';
 
 const ChatInput = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [streamingResponse, setStreamingResponse] = useState('');
   const { addMessage, addResponse, currentUserId, getCurrentUserMessages, companionName } = useChatStore();
   const { data: session } = useSession();
   const [voiceId, setVoiceId] = useState<string | null>(null);
-  const [lastResponse, setLastResponse] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Fetch voice ID on component mount
   useEffect(() => {
@@ -29,8 +30,6 @@ const ChatInput = () => {
         if (!response.ok) throw new Error('Failed to fetch voice ID');
         
         const data = await response.json();
-
-        console.log("Found Voice ID: ", data.companionVoiceId);
         setVoiceId(data.companionVoiceId);
       } catch (error) {
         console.error('Error fetching voice ID:', error);
@@ -42,17 +41,26 @@ const ChatInput = () => {
 
   useEffect(() => {
     const userId = session?.user?.email as string;
-      if (userId) {
-        useChatStore.getState().setCurrentUser(userId);
-      }
-    }, [session]);
+    if (userId) {
+      useChatStore.getState().setCurrentUser(userId);
+    }
+  }, [session]);
 
-    const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !currentUserId) return;
     
     setIsLoading(true);
     setError('');
+    setStreamingResponse('');
+    
+    // Cancel any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create a new AbortController
+    abortControllerRef.current = new AbortController();
     
     try {
       // Add user message to store
@@ -61,6 +69,9 @@ const ChatInput = () => {
         content: message.trim(),
       });
 
+      // Clear the input
+      setMessage('');
+      
       const response = await fetch('/api/model/cf', {
         method: 'POST',
         headers: {
@@ -70,37 +81,89 @@ const ChatInput = () => {
           userId: currentUserId,
           conversationMessages: getCurrentUserMessages(),
         }),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
         throw new Error('Failed to send message');
       }
 
-      const data = await response.json();
+      if (!response.body) {
+        throw new Error('Response body is null');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
       
-      // Clear the input first
-      setMessage('');
+      let finalResponse = '';
+
+      // Process the stream
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          break;
+        }
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n\n').filter(line => line.trim() !== '');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.error) {
+                throw new Error(data.error);
+              }
+              
+              if (data.done) {
+                // Stream completed
+                continue;
+              }
+              
+              // Update the streaming response
+              setStreamingResponse(prev => prev + (data.content || ''));
+              finalResponse = data.completeResponse || finalResponse;
+            } catch (err) {
+              console.error('Error parsing SSE data:', err);
+            }
+          }
+        }
+      }
       
-      // Add the response to the store
-      addResponse(currentUserId, data.modelResponse);
-      
-      // Trigger audio playback
-      setLastResponse(data.modelResponse);
+      // Add the complete response to the store once streaming is done
+      if (finalResponse) {
+        addResponse(currentUserId, finalResponse);
+      }
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setError(err.message || 'An error occurred');
+        console.error('Chat error:', err);
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   }, [message, currentUserId, addMessage, addResponse, getCurrentUserMessages]);
 
+  // Clean up AbortController on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   return (
     <div className="fixed bottom-0 left-0 right-0 p-7">
-      {lastResponse && voiceId && (
+      {streamingResponse && voiceId && (
         <AutoplayTextToSpeech 
-          text={lastResponse} 
+          text={streamingResponse} 
           voiceId={voiceId}
-          key={lastResponse} // Force new instance on new response
+          isStreaming={isLoading}
         />
       )}
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
@@ -119,6 +182,11 @@ const ChatInput = () => {
                 <p className="absolute -top-6 left-0 text-sm text-red-500">
                   {error}
                 </p>
+              )}
+              {isLoading && streamingResponse && (
+                <div className="absolute -top-6 right-0 text-sm text-accent">
+                  Streaming response...
+                </div>
               )}
             </div>
           </div>

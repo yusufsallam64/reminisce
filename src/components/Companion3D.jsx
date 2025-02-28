@@ -3,21 +3,38 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useChatStore } from '@/pages/api/model/chat-store';
 import { useSession } from 'next-auth/react';
 import * as THREE from 'three';
-import AutoplayTextToSpeech from './AutoplayTextToSpeech';
+import StreamingTextToSpeech from './StreamingTextToSpeech';
 
-const SpeechHandler = ({ isListening, setIsListening, voiceId, setLastResponse, hasAudioPermission }) => {
+const SpeechHandler = ({ isListening, setIsListening, voiceId, setStreamingResponse, hasAudioPermission }) => {
   const recognition = useRef(null);
-  const { addMessage, currentUserId, getCurrentUserMessages, addResponse } = useChatStore();
+  const { addMessage, currentUserId, getCurrentUserMessages } = useChatStore();
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const { data: session } = useSession();
   const startTimeRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   const handleApiCall = async (transcript) => {
     if (!session?.user?.email) return;
     
     setIsLoading(true);
+    setStreamingResponse('');
+    
+    // Cancel any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create a new AbortController
+    abortControllerRef.current = new AbortController();
+    
     try {
+      // Add user message to chat store
+      addMessage(currentUserId, {
+        role: 'user',
+        content: transcript,
+      });
+      
       const response = await fetch('/api/model/cf', {
         method: 'POST',
         headers: {
@@ -27,20 +44,70 @@ const SpeechHandler = ({ isListening, setIsListening, voiceId, setLastResponse, 
           userId: session.user.email,
           conversationMessages: getCurrentUserMessages(),
         }),
+        signal: abortControllerRef.current.signal,
       });
   
       if (!response.ok) {
         throw new Error('Failed to send message');
       }
-  
-      const data = await response.json();
-      addResponse(session.user.email, data.modelResponse);
-      setLastResponse(data.modelResponse);  // Add this line
+      
+      if (!response.body) {
+        throw new Error('Response body is null');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      let fullResponse = '';
+
+      // Process the stream
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          break;
+        }
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n\n').filter(line => line.trim() !== '');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.error) {
+                throw new Error(data.error);
+              }
+              
+              if (data.done) {
+                // Stream completed
+                continue;
+              }
+              
+              // Update the streaming response
+              setStreamingResponse(prev => prev + (data.content || ''));
+              fullResponse = data.completeResponse || fullResponse;
+            } catch (err) {
+              console.error('Error parsing SSE data:', err);
+            }
+          }
+        }
+      }
+      
+      // Add the full response to the chat store once streaming is complete
+      if (fullResponse) {
+        const { addResponse } = useChatStore.getState();
+        addResponse(session.user.email, fullResponse);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('API call error:', err);
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setError(err.message || 'An error occurred');
+        console.error('API call error:', err);
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -60,12 +127,6 @@ const SpeechHandler = ({ isListening, setIsListening, voiceId, setLastResponse, 
         console.log('Speech recognition result:', transcript);
         
         if (transcript.trim() && duration > 3) {
-          // Add user message to chat store
-          addMessage(currentUserId, {
-            role: 'user',
-            content: transcript,
-          });
-          
           // Make API call with the transcript
           await handleApiCall(transcript);
         }
@@ -77,7 +138,6 @@ const SpeechHandler = ({ isListening, setIsListening, voiceId, setLastResponse, 
         setIsListening(false);
         startTimeRef.current = null;
       };
-
 
       recognition.current.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
@@ -92,6 +152,11 @@ const SpeechHandler = ({ isListening, setIsListening, voiceId, setLastResponse, 
         recognition.current.stop();
       }
       startTimeRef.current = null;
+      
+      // Cancel any ongoing requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, [addMessage, setIsListening, session, hasAudioPermission]);
 
@@ -230,7 +295,6 @@ const OrbitalPaths = () => {
     { radius: 0.7, height: 0.2, turns: 2, rotation: [0, 0, 0] },
     { radius: 0.8, height: 0.4, turns: 3.14, rotation: [0, Math.PI / 4, 0] },
     { radius: 0.5, height: 0.3, turns: 3, rotation: [Math.PI / 3, 0, 0] },
-
   ];
 
   return (
@@ -278,11 +342,6 @@ const CoreParticle = ({ isListening, onClick }) => {
     }
   });
 
-  const handleClick = (e) => {
-    e.stopPropagation();
-    setIsListening(prev => !prev);
-  };
-
   return (
     <group onClick={onClick} style={{ cursor: 'pointer' }}>
       <mesh ref={coreRef}>
@@ -324,7 +383,7 @@ const CoreParticle = ({ isListening, onClick }) => {
 const Companion3D = () => {
   const [isListening, setIsListening] = useState(false);
   const [voiceId, setVoiceId] = useState(null);
-  const [lastResponse, setLastResponse] = useState(null);
+  const [streamingResponse, setStreamingResponse] = useState('');
   const [hasAudioPermission, setHasAudioPermission] = useState(false);
   const { data: session } = useSession();
 
@@ -424,7 +483,7 @@ const Companion3D = () => {
         isListening={isListening} 
         setIsListening={setIsListening}
         voiceId={voiceId}
-        setLastResponse={setLastResponse}
+        setStreamingResponse={setStreamingResponse}
         hasAudioPermission={hasAudioPermission}
       />
       <div className="w-[600px] h-[600px]">
@@ -453,11 +512,11 @@ const Companion3D = () => {
           Listening... (Click again to stop)
         </div>
       )}
-      {lastResponse && voiceId && (
-        <AutoplayTextToSpeech 
-          text={lastResponse} 
+      {streamingResponse && voiceId && (
+        <StreamingTextToSpeech 
+          text={streamingResponse} 
           voiceId={voiceId}
-          key={lastResponse}
+          isStreaming={!!streamingResponse}
         />
       )}
     </div>
