@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.7.2",
+    "@google-cloud/local-auth": "^2.1.0",
     "@react-three/drei": "^9.115.0",
     "@react-three/fiber": "^8.17.10",
     "elevenlabs": "^0.17.1",
+    "googleapis": "^144.0.0",
     "mongodb": "^6.10.0",
     "next": "15.0.1",
     "next-auth": "^4.24.10",

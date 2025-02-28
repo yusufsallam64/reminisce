@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { AIRequest, AIResponse, Message } from "./types";
 import client from "@/lib/db/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]";
+import { fetchCalendarEvents } from "../get-calendar-events";
 
 if (!process.env.CF_API_TOKEN || !process.env.CF_ACCOUNT_ID) {
   throw new Error("Missing required environment variables: CF_API_TOKEN and/or CF_ACCOUNT_ID");
@@ -13,6 +16,14 @@ if(!process.env.CF_LLM_MODEL) {
 type Data = {
   modelResponse: string;
 };
+
+interface CalEvents {
+  summary: string;
+  description: string;
+  location: string;
+  start: string;
+  end: string;
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -30,14 +41,45 @@ export default async function handler(
 
   const { userId, conversationMessages } = req.body;
 
-  const companion = await client.db("DB").collection("Companions").findOne({ userId: userId });
+  const session = await getServerSession(req, res, authOptions);
+  if(!session?.user?.email) {
+    res.status(401).json({modelResponse: "Unauthorized"});
+    return;
+  }
 
-  console.log("Companion:", companion);
+  if(userId !== session.user?.email) {
+    res.status(403).json({modelResponse: "Forbidden"});
+    return;
+  }
+
+  // TODO --> Fix this not awaiting the client.connect()
+  const companion = await client.db("DB").collection("Companions").findOne({ userId: session.user?.email });
+
+  const calendarInformation = await fetchCalendarEvents(userId);
+  
+  let calEvents: CalEvents[] = (calendarInformation ?? []).map((event: any) => {
+      return {
+        summary: event.summary,
+        description: event.description,
+        location: event.location,
+        start: event.start.dateTime,
+        end: event.end.dateTime,
+    }
+  });
+
+  const calEventMessages = "You will additionally be provided with information regarding upcoming events that the patient has. Ensure that you are reminding them of these events. \
+    Make sure that you tell them in natural language when these events are happening and how far away they are relative to the current time, which you will also be provided. \n \
+    If the user is asking for information regarding an event, be concise and do not provide distracting or extra, unnecesssary information. \
+    Current Time: " + new Date().toLocaleString() + " \ " +
+    calEvents.map((event) => {
+      return `Upcoming Event: ${event.summary} \nDescription: ${event.description} \nLocation: ${event.location} \nStart Time: ${event.start} \nEnd Time: ${event.end}`;
+    }).join("\n\n")
+
 
   let messages: Message[] = [
     {
       role: "system",
-      content: companion?.masterPrompt ?? " \
+      content: (companion?.masterPrompt ?? " \
         You are a close relative or companion of an individual with dementia. \
         Your job is to help them remember important details about their life. \
         Provide short, concise answers that provide them with companionship. \
@@ -45,14 +87,15 @@ export default async function handler(
         If the user demonstrates confusion, provide them with a reminder of the context. \
         If they have any important reminders or duties that they must remember to perform, periodically include reminders within messages. \
         The user may ask you to repeat information, so be prepared to do so. \
-        If the user's message contains any potentially distressed/sad/angry messages, work to alleviate these emotions and relax them."
-    }, 
-    ...conversationMessages.slice(-8).map((message: any) => {
-      return {
-        role: message.role,
-        content: message.content,
-      };
-    })
+        If the user's message contains any potentially distressed/sad/angry messages, work to alleviate these emotions and relax them.")
+        + calEventMessages, 
+        ...conversationMessages.slice(-8).map((message: any) => {
+        return {
+          role: message.role,
+          content: message.content,
+        };
+      })
+    }
   ];  
 
   const modelResponse = await run({ messages });
