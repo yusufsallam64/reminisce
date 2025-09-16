@@ -1,5 +1,14 @@
 import { MongoClient, ServerApiVersion } from "mongodb";
 
+// Load environment variables if not already loaded
+if (!process.env.MONGODB_URI) {
+    try {
+        require('dotenv').config();
+    } catch (error) {
+        // dotenv might not be available in production
+    }
+}
+
 if (!process.env.MONGODB_URI) {
     throw new Error("Please define the MONGODB_URI environment variable inside .env");
 }
@@ -11,7 +20,7 @@ let client: MongoClient
 const options = {
     serverApi: {
         version: ServerApiVersion.v1,
-        strict: true,
+        strict: false,  // Must be false to allow $vectorSearch
         deprecationErrors: true,
     }
 }
