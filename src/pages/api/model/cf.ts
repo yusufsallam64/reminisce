@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]";
 import { fetchCalendarEvents } from "../get-calendar-events";
 import { OpenAI } from "openai";
+import { vectorSearch } from "@/lib/rag/search";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -59,37 +60,65 @@ export default async function handler(
       .filter((msg: any) => msg.role === 'user')
       .slice(-1)[0]?.content || '';
 
-    // Search for relevant documents using Python RAG service
+    // Search for relevant documents using vector search
     let relevantContext = '';
-    if (latestUserMessage && companion.hasDocuments) {
-      try {
-        const searchResponse = await fetch(`${process.env.PYTHON_RAG_SERVICE_URL}/search`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            query: latestUserMessage,
-            user_id: session.user.email,
-            companion_id: companion._id.toString(),
-            limit: 3
-          })
-        });
+    let ragStatus = 'not_attempted';
 
-        if (searchResponse.ok) {
-          const searchResults = await searchResponse.json();
-          if (searchResults.results && searchResults.results.length > 0) {
-            relevantContext = '\n\nRelevant memories and documents:\n' +
-              searchResults.results.map((doc: any, index: number) =>
-                `Memory ${index + 1}: ${doc.title || 'Document'}\n${doc.content.substring(0, 300)}${doc.content.length > 300 ? '...' : ''}`
-              ).join('\n\n');
+    if (latestUserMessage && companion.hasDocuments && companion.documentCount > 0) {
+      ragStatus = 'searching';
+      try {
+        console.log(`🔍 Searching for relevant memories with query: "${latestUserMessage}"`);
+        console.log(`📁 Companion has ${companion.documentCount} processed documents`);
+
+        const searchResults = await vectorSearch(
+          latestUserMessage,
+          session.user.email,
+          companion._id.toString(),
+          { limit: 5, numCandidates: 20 }
+        );
+
+        if (searchResults && searchResults.length > 0) {
+          ragStatus = 'success';
+          console.log(`✅ Found ${searchResults.length} relevant memories with scores:`,
+            searchResults.map(r => Math.round(r.score * 100)).join('%, ') + '%');
+
+          // Filter out low relevance results (below 10% similarity)
+          const relevantResults = searchResults.filter(doc => doc.score > 0.1);
+
+          if (relevantResults.length > 0) {
+            relevantContext = '\n\n📚 RELEVANT MEMORIES FROM YOUR DOCUMENTS:\n' +
+              relevantResults.map((doc, index) => {
+                const score = Math.round(doc.score * 100);
+                const fileName = doc.metadata?.originalFilename || doc.title || 'Document';
+                return `Memory ${index + 1} (${score}% match) from "${fileName}":\n${doc.content.substring(0, 500)}${doc.content.length > 500 ? '...' : ''}`;
+              }).join('\n\n---\n\n');
+
+            // Add instruction for using the context
+            relevantContext += '\n\n🎯 INSTRUCTION: Use these specific memories to provide personalized responses. Reference exact details, names, dates, and experiences from these documents when they relate to the conversation. These are real memories from the user\'s life.';
+          } else {
+            ragStatus = 'low_relevance';
+            console.log('⚠️ All memories had low relevance scores, not including context');
           }
+        } else {
+          ragStatus = 'no_results';
+          console.log('❌ No relevant memories found for this query');
         }
       } catch (error) {
-        console.error('Error retrieving RAG context from Python service:', error);
+        ragStatus = 'error';
+        console.error('💥 Error retrieving RAG context:', error);
+
+        // Add a note to system prompt about RAG failure
+        if (error instanceof Error) {
+          console.error('RAG Error details:', error.message);
+        }
         // Continue without RAG context if search fails
       }
+    } else if (!companion.hasDocuments) {
+      ragStatus = 'no_documents';
+      console.log('📄 No documents uploaded for this companion');
     }
+
+    console.log(`🎯 RAG Status: ${ragStatus}`);
 
     // Fetch calendar events
     const calendarInformation = await fetchCalendarEvents(userId);
