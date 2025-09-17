@@ -43,18 +43,24 @@ const DocumentUploader = ({ onFilesUploaded, error: externalError }) => {
     return fileArray;
   };
 
-  const handleFileSelect = useCallback((selectedFiles) => {
+  const handleFileSelect = useCallback(async (selectedFiles) => {
     try {
       setError('');
       const validatedFiles = validateFiles(selectedFiles);
 
-      const newFiles = validatedFiles.map(file => ({
-        file,
-        id: `${file.name}-${Date.now()}-${Math.random()}`,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        status: 'pending' // pending, uploading, completed, error
+      const newFiles = await Promise.all(validatedFiles.map(async (file) => {
+        // Convert file to base64 for JSON serialization
+        const arrayBuffer = await file.arrayBuffer();
+        const base64Data = Buffer.from(arrayBuffer).toString('base64');
+
+        return {
+          id: `${file.name}-${Date.now()}-${Math.random()}`,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          status: 'pending', // pending, uploading, completed, error
+          base64Data: base64Data
+        };
       }));
 
       setFiles(prev => [...prev, ...newFiles]);

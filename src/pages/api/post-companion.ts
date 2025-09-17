@@ -4,6 +4,15 @@ import { authOptions } from './auth/[...nextauth]';
 import client from '@/lib/db/client';
 import companionQuestions from '@/data/companionQuestions.json';
 
+// Configure API route to handle larger payloads for file uploads
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+  },
+};
+
 type LovedOne = {
   name: string;
   relationship: string;
@@ -24,7 +33,7 @@ type UploadedFile = {
   size: number;
   type: string;
   status: string;
-  file?: File;
+  base64Data?: string;
 };
 
 function generateMasterPrompt(formData: any): string {
@@ -125,30 +134,113 @@ export default async function handler(
     const result = await db.collection('Companions').insertOne(companionData);
     const companionId = result.insertedId.toString();
 
-    // Note: Document processing is now handled by the Python embedding service
-    // Documents will be processed separately via the /process-document endpoint
+    // Process documents with Python RAG service if files are uploaded
     const uploadedFiles = formData.uploadedFiles as UploadedFile[] || [];
-    
+    let documentProcessingSuccess = true;
+    let processedCount = 0;
+
     if (uploadedFiles.length > 0) {
-      // Update companion to indicate it has pending documents
-      await db.collection('Companions').updateOne(
-        { _id: result.insertedId },
-        {
-          $set: {
-            hasDocuments: false, // Will be set to true after Python processing
-            documentCount: 0, // Will be updated after processing
-            pendingDocuments: uploadedFiles.length,
-            lastDocumentUpdate: new Date()
+      try {
+        console.log(`Processing ${uploadedFiles.length} documents with Python RAG service...`);
+        const ragServiceUrl = process.env.PYTHON_RAG_SERVICE_URL || 'http://localhost:8000';
+
+        // Process each file individually (Python service expects one file per request)
+        for (const fileItem of uploadedFiles) {
+          if (fileItem.base64Data) {
+            try {
+              console.log(`Processing file: ${fileItem.name}`);
+
+              // Convert base64 back to Buffer
+              const buffer = Buffer.from(fileItem.base64Data, 'base64');
+
+              // Create FormData for this individual file
+              const formDataToSend = new FormData();
+
+              // Create a Blob with proper metadata
+              const blob = new Blob([buffer], { type: fileItem.type });
+              formDataToSend.append('file', blob, fileItem.name);
+              formDataToSend.append('title', fileItem.name); // Required by Python service
+              formDataToSend.append('user_id', session.user.email);
+              formDataToSend.append('companion_id', companionId);
+
+              const processResponse = await fetch(`${ragServiceUrl}/process-document`, {
+                method: 'POST',
+                body: formDataToSend,
+              });
+
+              if (processResponse.ok) {
+                console.log(`Successfully processed file: ${fileItem.name}`);
+                processedCount++;
+              } else {
+                const errorText = await processResponse.text();
+                console.error(`Failed to process file ${fileItem.name}:`, processResponse.status, errorText);
+                documentProcessingSuccess = false;
+              }
+            } catch (fileError) {
+              console.error(`Error processing file ${fileItem.name}:`, fileError);
+              documentProcessingSuccess = false;
+            }
           }
         }
-      );
-      console.log(`Companion ${companionId} created with ${uploadedFiles.length} pending documents for processing`);
+
+        // Update companion based on processing results
+        if (processedCount > 0) {
+          console.log(`Successfully processed ${processedCount}/${uploadedFiles.length} documents`);
+
+          await db.collection('Companions').updateOne(
+            { _id: result.insertedId },
+            {
+              $set: {
+                hasDocuments: true,
+                documentCount: processedCount,
+                lastDocumentUpdate: new Date(),
+                ragProcessingStatus: documentProcessingSuccess ? 'completed' : 'partial',
+                totalFilesUploaded: uploadedFiles.length
+              }
+            }
+          );
+        } else {
+          console.error('No documents were successfully processed');
+          documentProcessingSuccess = false;
+
+          await db.collection('Companions').updateOne(
+            { _id: result.insertedId },
+            {
+              $set: {
+                hasDocuments: false,
+                documentCount: 0,
+                ragProcessingStatus: 'failed',
+                ragProcessingError: 'No documents could be processed',
+                lastDocumentUpdate: new Date()
+              }
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Error connecting to Python RAG service:', error);
+        documentProcessingSuccess = false;
+
+        // Update companion to indicate failed processing
+        await db.collection('Companions').updateOne(
+          { _id: result.insertedId },
+          {
+            $set: {
+              hasDocuments: false,
+              documentCount: 0,
+              ragProcessingStatus: 'failed',
+              ragProcessingError: error instanceof Error ? error.message : 'Unknown error',
+              lastDocumentUpdate: new Date()
+            }
+          }
+        );
+      }
     }
 
     return res.status(200).json({
       message: 'Companion created successfully',
       companionId: companionId,
-      pendingDocuments: uploadedFiles.length,
+      documentsProcessed: uploadedFiles.length,
+      documentProcessingSuccess: documentProcessingSuccess,
       hasUploadedFiles: uploadedFiles.length > 0
     });
 
