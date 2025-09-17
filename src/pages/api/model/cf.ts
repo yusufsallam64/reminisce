@@ -47,7 +47,50 @@ export default async function handler(
   try {
     // Fetch companion data
     const companion = await client.db("DB").collection("Companions").findOne({ userId: session.user?.email });
-    
+
+    if (!companion) {
+      res.write(`data: ${JSON.stringify({ error: "Companion not found" })}\n\n`);
+      res.end();
+      return;
+    }
+
+    // Get the latest user message for RAG context retrieval
+    const latestUserMessage = conversationMessages
+      .filter((msg: any) => msg.role === 'user')
+      .slice(-1)[0]?.content || '';
+
+    // Search for relevant documents using Python RAG service
+    let relevantContext = '';
+    if (latestUserMessage && companion.hasDocuments) {
+      try {
+        const searchResponse = await fetch(`${process.env.PYTHON_RAG_SERVICE_URL}/search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: latestUserMessage,
+            user_id: session.user.email,
+            companion_id: companion._id.toString(),
+            limit: 3
+          })
+        });
+
+        if (searchResponse.ok) {
+          const searchResults = await searchResponse.json();
+          if (searchResults.results && searchResults.results.length > 0) {
+            relevantContext = '\n\nRelevant memories and documents:\n' +
+              searchResults.results.map((doc: any, index: number) =>
+                `Memory ${index + 1}: ${doc.title || 'Document'}\n${doc.content.substring(0, 300)}${doc.content.length > 300 ? '...' : ''}`
+              ).join('\n\n');
+          }
+        }
+      } catch (error) {
+        console.error('Error retrieving RAG context from Python service:', error);
+        // Continue without RAG context if search fails
+      }
+    }
+
     // Fetch calendar events
     const calendarInformation = await fetchCalendarEvents(userId);
     
@@ -78,7 +121,8 @@ export default async function handler(
       If they have any important reminders or duties that they must remember to perform, periodically include reminders within messages. \
       The user may ask you to repeat information, so be prepared to do so. \
       If the user's message contains any potentially distressed/sad/angry messages, work to alleviate these emotions and relax them.")
-      + calEventMessages;
+      + calEventMessages
+      + relevantContext;
 
     // Prepare messages for OpenAI
     const openaiMessages = [

@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import companionQuestions from '@/data/companionQuestions.json';
 import {getServerSession} from "next-auth/next";
 import client from '@/lib/db/client'; 
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 import AudioRecorder from '@/components/AudioRecorder';
+import DocumentUploader from '@/components/DocumentUploader';
 
 const CreateCompanionForm = () => {
    const router = useRouter();
+   const { data: session } = useSession();
    const [isSubmitting, setIsSubmitting] = useState(false);
    const [error, setError] = useState('');
 
    const [voiceId, setVoiceId] = useState(null);
+   const [uploadedFiles, setUploadedFiles] = useState([]);
 
    const initialState = Object.entries(companionQuestions).reduce((acc, [category, { questions }]) => {
       questions.forEach(q => {
@@ -154,7 +158,8 @@ const CreateCompanionForm = () => {
 
       const submissionData = {
          ...formData,
-         voiceId: voiceId // Make sure voiceId is included in submission
+         voiceId: voiceId, // Make sure voiceId is included in submission
+         uploadedFiles: uploadedFiles // Include uploaded files
       };
 
       console.log(submissionData);
@@ -173,6 +178,35 @@ const CreateCompanionForm = () => {
          }
 
          const data = await response.json();
+         
+         // If there are uploaded files, process them with the Python service
+         if (uploadedFiles.length > 0) {
+            try {
+               console.log(`Processing ${uploadedFiles.length} documents with Python service...`);
+               const formData = new FormData();
+               formData.append('user_id', session?.user?.email || '');
+               formData.append('companion_id', data.companionId);
+               
+               uploadedFiles.forEach((fileItem, index) => {
+                  formData.append('files', fileItem.file);
+               });
+
+               const processResponse = await fetch(`${process.env.NEXT_PUBLIC_PYTHON_RAG_SERVICE_URL || 'http://localhost:8000'}/process-document`, {
+                  method: 'POST',
+                  body: formData,
+               });
+
+               if (processResponse.ok) {
+                  console.log('Documents processed successfully');
+               } else {
+                  console.warn('Document processing failed, but companion was created');
+               }
+            } catch (error) {
+               console.error('Error processing documents:', error);
+               // Don't block companion creation if document processing fails
+            }
+         }
+         
          router.push('/companion');
       } catch (error) {
          console.error('Error creating companion:', error);
@@ -212,10 +246,25 @@ const CreateCompanionForm = () => {
                      </label>
                      <AudioRecorder setVoiceId={setVoiceId} />
                   </div>
+
+                  <div>
+                     <SectionTitle>Memory Documents</SectionTitle>
+                     <div className="mb-4">
+                        <p className="text-text text-sm mb-4">
+                           Upload photos, documents, letters, or any files that contain important memories.
+                           These will help your companion provide more personalized and meaningful conversations
+                           by understanding your unique experiences and relationships.
+                        </p>
+                        <DocumentUploader
+                           onFilesUploaded={setUploadedFiles}
+                           error={error}
+                        />
+                     </div>
+                  </div>
                   <div className="flex justify-end">
                      <button
                         type="submit"
-                        disabled={isSubmitting || !voiceId || !formData.companionName} 
+                        disabled={isSubmitting || !voiceId || !formData.name} 
                         className="text-text border border-secondary px-6 py-2 rounded-md transition-opacity ease-in duration-300 font-semibold disabled:opacity-50 hover:enabled:bg-primary active:enabled:bg-secondary"
                      >
                         {isSubmitting ? 'Creating...' : 'Create Companion'}

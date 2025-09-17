@@ -3,12 +3,12 @@
      "title": "Personal Information",
      "description": "Basic information about your loved one",
      "questions": [
-       {
-         "id": "name",
-         "label": "Full Name",
-         "type": "text",
-         "required": true
-       },
+      {
+        "id": "name",
+        "label": "Full Name",
+        "type": "text",
+        "required": true
+      },
        {
          "id": "nickname",
          "label": "Nickname",
@@ -19,7 +19,7 @@
          "id": "birthday",
          "label": "Birthday",
          "type": "date",
-         "required": true
+         "required": false
        },
        {
          "id": "lovedOnes",
@@ -71,25 +71,25 @@
          "id": "significantExperience",
          "label": "Share a memorable moment or story",
          "type": "textarea",
-         "required": true
+         "required": false
        },
        {
          "id": "primaryResidence",
          "label": "Where did they live most of their life?",
          "type": "text",
-         "required": true
+         "required": false
        },
        {
          "id": "career",
          "label": "What was their career/profession?",
          "type": "text",
-         "required": true
+         "required": false
        },
        {
          "id": "achievements",
          "label": "What were their biggest achievements?",
          "type": "textarea",
-         "required": true
+         "required": false
        },
        {
          "id": "hardships",
@@ -107,7 +107,7 @@
          "id": "commonPhrases",
          "label": "What specific phrases or expressions do they use frequently?",
          "type": "textarea",
-         "required": true
+         "required": false
        },
        {
          "id": "communicationStyle",
@@ -120,25 +120,25 @@
            "Casual",
            "Very casual"
          ],
-         "required": true
+         "required": false
        },
        {
          "id": "humorType",
          "label": "Describe their sense of humor",
          "type": "textarea",
-         "required": true
+         "required": false
        },
        {
          "id": "affectionStyle",
          "label": "How do they show affection or care?",
          "type": "textarea",
-         "required": true
+         "required": false
        },
        {
          "id": "passion",
          "label": "What was their passion?",
          "type": "textarea",
-         "required": true
+         "required": false
        }
      ]
    },
@@ -150,7 +150,7 @@
          "id": "hobbies",
          "label": "What are their shared hobbies and pastimes?",
          "type": "textarea",
-         "required": true
+         "required": false
        },
        {
          "id": "musicGenre",
@@ -186,7 +186,7 @@
          "id": "favorites",
          "label": "List their favorite pieces of media",
          "type": "textarea",
-         "required": true
+         "required": false
        },
        {
          "id": "traditions",

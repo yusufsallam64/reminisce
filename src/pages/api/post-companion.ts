@@ -18,6 +18,15 @@ type CompanionData = {
   [key: string]: any;
 };
 
+type UploadedFile = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  status: string;
+  file?: File;
+};
+
 function generateMasterPrompt(formData: any): string {
   // Function to create a sentence from question label and response
   const createDetailSentence = (label: string, value: any): string => {
@@ -105,16 +114,42 @@ export default async function handler(
     const companionData = {
       userId: session.user.email,
       voiceId: formData.voiceId,
-      companionName: formData.companionName,
+      companionName: formData.name,
       createdAt: new Date(),
-      masterPrompt: masterPrompt
+      masterPrompt: masterPrompt,
+      documentIds: [] as string[], // Will be populated with processed document IDs
+      hasDocuments: false,
+      documentCount: 0
     };
 
     const result = await db.collection('Companions').insertOne(companionData);
+    const companionId = result.insertedId.toString();
 
-    return res.status(200).json({ 
+    // Note: Document processing is now handled by the Python embedding service
+    // Documents will be processed separately via the /process-document endpoint
+    const uploadedFiles = formData.uploadedFiles as UploadedFile[] || [];
+    
+    if (uploadedFiles.length > 0) {
+      // Update companion to indicate it has pending documents
+      await db.collection('Companions').updateOne(
+        { _id: result.insertedId },
+        {
+          $set: {
+            hasDocuments: false, // Will be set to true after Python processing
+            documentCount: 0, // Will be updated after processing
+            pendingDocuments: uploadedFiles.length,
+            lastDocumentUpdate: new Date()
+          }
+        }
+      );
+      console.log(`Companion ${companionId} created with ${uploadedFiles.length} pending documents for processing`);
+    }
+
+    return res.status(200).json({
       message: 'Companion created successfully',
-      companionId: result.insertedId 
+      companionId: companionId,
+      pendingDocuments: uploadedFiles.length,
+      hasUploadedFiles: uploadedFiles.length > 0
     });
 
   } catch (error) {

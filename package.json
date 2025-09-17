@@ -3,12 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "devt": "next dev --turbopack",
+    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev",
+    "devt": "NODE_OPTIONS='--max-old-space-size=4096' next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "test:rag": "tsx scripts/test-rag.ts"
+    "lint": "next lint"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.7.2",
